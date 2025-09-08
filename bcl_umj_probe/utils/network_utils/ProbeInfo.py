@@ -60,44 +60,68 @@ class ProbeInfo(Network):
             return str(id)
         else:
             return self.logger.info("Probe ID Gen Failed")  
-
+    
     def collect_local_stats(self, id: str, hostname: str):
-        stat_data={}
+        stat_data = {}
 
         stat_data["prb_id"] = id
         stat_data["hstnm"] = hostname
-        
+
         self.logger.info("\n📍 Local System Stats")
         stat_data["sys"] = f"{platform.system()} {platform.release()}"
         stat_data["cpu"] = f"{psutil.cpu_percent()}%"
         mem = psutil.virtual_memory()
         stat_data["mem"] = f"{mem.used / 1024**2:.2f} MB / {mem.total / 1024**2:.2f} MB"
         disk = psutil.disk_usage('/')
-        stat_data['dsk'] = f"{disk.used / 1024**3:.2f} GB / {disk.total / 1024**3:.2f} GB"
+        stat_data["dsk"] = f"{disk.used / 1024**3:.2f} GB / {disk.total / 1024**3:.2f} GB"
         uptime = subprocess.getoutput("uptime -p")
-        stat_data['upt'] = f"{uptime}"
-        stat_data['ifcs'] = {}
-        
+        stat_data["upt"] = uptime
+        stat_data["ifcs"] = {}
+
         # Network interfaces
         self.logger.info("\n🔌 Interface Statistics:")
         for iface, addrs in psutil.net_if_addrs().items():
+            # Skip loopback
+            if iface in ("lo", "lo0"):
+                continue
 
-            stats = psutil.net_if_stats()[iface]
-            io = psutil.net_io_counters(pernic=True)[iface]
-            stat_data['ifcs'][iface]['dta'] = stats
-            stat_data['ifcs'][iface]['bndwth_io'] = f"  Sent: {io.bytes_sent / 1024:.2f} KB | Recv: {io.bytes_recv / 1024:.2f} KB"
-            stat_data['ifcs'][iface]['pckt_io'] = f"  Sent Packets: {io.packets_sent} | Recv Packets: {io.packets_recv}"
+            stats = psutil.net_if_stats().get(iface)
+            io = psutil.net_io_counters(pernic=True).get(iface)
 
-            """
+            # Ensure dict exists
+            stat_data["ifcs"][iface] = {}
+
+            if stats:
+                stat_data["ifcs"][iface]["dta"] = {
+                    "isup": stats.isup,
+                    "duplex": stats.duplex,
+                    "speed": stats.speed,
+                    "mtu": stats.mtu,
+                }
+
+            if io:
+                stat_data["ifcs"][iface]["bndwth_io"] = (
+                    f"Sent: {io.bytes_sent / 1024:.2f} KB | "
+                    f"Recv: {io.bytes_recv / 1024:.2f} KB"
+                )
+                stat_data["ifcs"][iface]["pckt_io"] = (
+                    f"Sent Packets: {io.packets_sent} | "
+                    f"Recv Packets: {io.packets_recv}"
+                )
+
+            # Logging per interface
             self.logger.info(f"Interface: {iface}")
-            self.logger.info(f"  Speed: {stats.speed} Mbps")
-            self.logger.info(f"  Status: {'UP' if stats.isup else 'DOWN'}")
-            io = psutil.net_io_counters(pernic=True)[iface]
-            self.logger.info(f"  Sent: {io.bytes_sent / 1024:.2f} KB | Recv: {io.bytes_recv / 1024:.2f} KB")
-            
-            """
+            if stats:
+                self.logger.info(f"  Speed: {stats.speed} Mbps")
+                self.logger.info(f"  Status: {'UP' if stats.isup else 'DOWN'}")
+            if io:
+                self.logger.info(
+                    f"  Sent: {io.bytes_sent / 1024:.2f} KB | "
+                    f"Recv: {io.bytes_recv / 1024:.2f} KB"
+                )
 
-        return stat_data if stat_data.items() else None
+        return stat_data if stat_data else None
+
     
     def get_public_ip(self) -> str:
         """
