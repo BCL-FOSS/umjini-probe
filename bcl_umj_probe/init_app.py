@@ -26,22 +26,32 @@ net_test = NetworkTest()
 net_utils = NetUtil(interface='')
 net_snmp = NetworkSNMP()
 
+# local Redis DB Init
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+pong = r.ping()
+logger.info(f"Redis ping: {pong}")
+
 def init_probe():
     prb_id, hstnm = probe_utils.gen_probe_register_data()
-    probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
-    probe_data['api_key'] = bcrypt.hash(str(uuid.uuid4()))
-    logger.info(f"API Key for umjiniti probe {id}: {probe_data['api_key']}. Store this is a secure location as it will not be displayed again.")
-    logger.info(probe_data)
-    logger.info(probe_utils.get_ifaces())
+    cursor, keys = r.scan(cursor=0, match=f'*{hstnm}*')
 
-    return prb_id, hstnm, probe_data
+    if keys:
+        for redis_key in keys:
+            hash_data = r.hgetall(redis_key)
+            logger.info(hash_data)
+            prb_id = hash_data.get('prb_id')
+            probe_data = hash_data
+        return prb_id, hstnm, probe_data
+    else:
+        probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
+        probe_data['api_key'] = bcrypt.hash(str(uuid.uuid4()))
+        logger.info(f"API Key for umjiniti probe {id}: {probe_data['api_key']}. Store this is a secure location as it will not be displayed again.")
+        logger.info(probe_data)
+        logger.info(probe_utils.get_ifaces())
+        return prb_id, hstnm, probe_data
 
 # Dependency function to validate the API key
 def validate_api_key(key: str = Depends(api_key_header)):
-    r = redis.Redis(host='localhost', port=6379, decode_responses=True)  # decode for str output
-    pong = r.ping()
-    logger.info(f"Redis ping: {pong}")
-
     _, hostname = probe_utils.gen_probe_register_data()
     cursor, keys = r.scan(cursor=0, match=f'*{hostname}*')
 

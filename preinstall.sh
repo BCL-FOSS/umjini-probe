@@ -170,3 +170,4 @@ get_distro() {
 
 DISTRIBUTION=$(get_distro)
 install_dependencies "$DISTRIBUTION"
+open_firewall_port "$DISTRIBUTION"
