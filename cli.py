@@ -5,14 +5,10 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 import logging
-from bcl_umj_probe.utils.RedisDB import RedisDB
-from bcl_umj_probe.utils.network_utils.ProbeInfo import ProbeInfo
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
-prb_db = RedisDB(hostname='localhost', port='6379')
-probe_utils = ProbeInfo()
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 BUILD_SCRIPT = PROJECT_ROOT / "build_package.sh"
