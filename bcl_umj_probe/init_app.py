@@ -1,5 +1,4 @@
-from fastapi import FastAPI
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
 import redis
 from utils.network_utils.ProbeInfo import ProbeInfo
@@ -13,6 +12,7 @@ from utils.NetUtil import NetUtil
 from utils.network_utils.NetworkSNMP import NetworkSNMP
 import uuid
 from passlib.hash import bcrypt
+from typing import Callable
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
@@ -25,6 +25,40 @@ net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
 net_utils = NetUtil(interface='')
 net_snmp = NetworkSNMP()
+
+prb_action_map: dict[str, Callable[[dict], object]] = {
+    "prbdta": probe_utils.get_probe_data,
+    "prbprc": probe_utils.get_processes_by_names,
+    "prbprt": probe_utils.open_listening_ports,
+    "prbifc": probe_utils.get_iface_ips,
+}
+
+dscv_action_map: dict[str, Callable[[dict], object]] = {
+    "dscv_full": net_utils.full_discovery,
+    "scan_ack": net_discovery.scan_ack,
+    "scan_ip": net_discovery.scan_ip,
+    "scan_xmas": net_discovery.scan_xmas,
+    "dscv_arp": net_discovery.dscv_arp,
+    "dscv_dhcp": net_discovery.dscv_dhcp,
+    "dscv_tcp": net_discovery.dscv_tcp,
+    "dscv_udp": net_discovery.dscv_udp,
+}
+
+net_test_action_map: dict[str, Callable[[dict], object]] = {
+    "spdtst": net_test.start_iperf,
+    "trcrt_dns": net_test.traceroute_dns,
+    "trcrt_syn": net_test.traceroute_syn,
+    "trcrt_udp": net_test.traceroute_udp,
+}
+
+wifi_action_map: dict[str, Callable[[dict], object]] = {
+    "wifi_srvy_on": net_utils.start_survey,
+    "wifi_srvy_off": net_utils.stop_survey,
+    "wifi_srvy_rprt": net_utils.generate_report,
+    "wifi_srvy_json": net_utils.get_survey_json,
+}
+
+snmp_action_map: dict[str, Callable[[dict], object]] = {}
 
 # local Redis DB Init
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
@@ -65,7 +99,7 @@ def validate_api_key(key: str = Depends(api_key_header)):
                 raise
 
             if bcrypt.verify(key, stored_api_key):
-                return key
+                return 200
             else:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -97,4 +131,3 @@ def validate_api_key(key: str = Depends(api_key_header)):
 
 """
 prb_id, hstnm, probe_data = init_probe()
-api = FastAPI()

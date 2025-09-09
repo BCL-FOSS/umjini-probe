@@ -60,7 +60,7 @@ class NetUtil():
 
     async def full_discovery(self, action: str, interface: str, subnet: str):
         # Step 1: Layer 2 ARP Discovery
-        devices_raw = self.discovery.discover_devices(iface=self.iface, action=action,
+        devices_raw = self.discovery.discover_devices(iface=interface, action=action,
                                                 params={"interface": interface, "subnet_cidr": subnet})
         if not devices_raw:
             return {}
@@ -73,28 +73,23 @@ class NetUtil():
 
             # Step 2: TCP ACK + Xmas + IP scans
             open_ports = []
-            try:
-                ack_ans, _ = self.discovery.scan_ack(ip, [22, 80, 443, 161, 3389])
-                xmas_ans, _ = self.discovery.scan_xmas(ip)
-                ip_ans, _ = self.discovery.scan_ip(ip)
+          
+            ans, ack_ans, ack_unans = self.discovery.scan_ack(ip, [21, 22, 25, 53, 68, 80, 443, 161, 3389])
+            xmas_ans, _ = self.discovery.scan_xmas(ip)
+            ip_ans, _ = self.discovery.scan_ip(ip)
 
-                for pkt in ack_ans:
-                    open_ports.append(pkt[0][TCP].dport)
-
-            except Exception as e:
-                self.logger(f"TCP scan error on {ip}: {e}")
+            for pkt in ans:
+                open_ports.append(pkt[0][TCP].dport)
 
             # Step 3: SNMP discovery
             snmp_info = {}
-            try:
-                snmp_devices = await self.snmp.discover_snmp_devices([ipaddress.ip_address(ip)])
-                if ip in snmp_devices:
-                    snmp_info = {
-                        "if_descr": await self.snmp.get(ip, self.snmp.OIDS["if_descr"])
-                    }
-            except Exception as e:
-                self.logger(f"SNMP error on {ip}: {e}")
-
+         
+            snmp_devices = await self.snmp.discover_snmp_devices([ipaddress.ip_address(ip)])
+            if ip in snmp_devices:
+                snmp_info = {
+                    "if_descr": await self.snmp.get(ip, self.snmp.OIDS["if_descr"])
+                }
+         
             # Step 4: Predict role
             role = self.predict_role(open_ports, snmp_info)
 
@@ -104,6 +99,8 @@ class NetUtil():
                 "mac": mac,
                 "vendor": vendor,
                 "open_ports": open_ports,
+                "unfiltered_ports": ack_ans,
+                "filtered_ports": ack_unans,
                 "snmp_info": snmp_info,
                 "role": role
             }

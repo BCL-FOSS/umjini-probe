@@ -97,7 +97,6 @@ class NetworkDiscovery(Network):
                         "vendor": self.vendor_lookup.get_manuf(mac) or "Unknown"
                     }
 
-            # Cache results
             timestamp = int(time.time())
             for d in combined.values():
                 key = f"device:scan:{d['mac']}"
@@ -119,23 +118,22 @@ class NetworkDiscovery(Network):
 
         Returns:
             ans, unans (list) : list of filtered and unfiltered ports on target host
-        """
-        ports=[]
-        
-
+        """      
+        unfiltered = []
+        filtered = []
         ans, unans = sr(IP(dst=target)/TCP(dport=ports,flags="A", options=[('Timestamp',(0,0))]))
         # Unfiltered ports
         for s,r in ans:
             if s[TCP].dport == r[TCP].sport:
-                self.logger.info("%d is unfiltered" % s[TCP].dport)
-                ports.append({'unfiltered': s[TCP].dport})
+                self.logger.info(f"{s[TCP].dport} is unfiltered")
+                unfiltered.append(s[TCP].dport)
 
         # Filtered ports
         for s in unans:
-            self.logger.info("%d is filtered" % s[TCP].dport)
-            ports.append({'filtered': s[TCP].dport})
+            self.logger.info(f"{s[TCP].dport} is filtered")
+            filtered.append(s[TCP].dport)
 
-        return ports
+        return ans, unfiltered, filtered
     
     def scan_xmas(self, target: str):
         """
@@ -147,13 +145,9 @@ class NetworkDiscovery(Network):
         Returns:
             ans, unans (list) : list of closed ports on target host
         """
-        result = {}
-
         ans, unans = sr(IP(dst=target)/TCP(dport=666,flags="FPU", options=[('Timestamp',(0,0))]) )
-        result['ans'] = ans.make_table()
-        result['unans'] = unans.make_table()
-
-        return result
+        
+        return ans
     
     def scan_ip(self, target: str):
         """
@@ -165,13 +159,9 @@ class NetworkDiscovery(Network):
         Returns:
             ans, unans (list): list of sent/received packets answered and unanswered packets
         """
-        result = {}
         ans, unans = sr(IP(dst=target,proto=(0,255))/"SCAPY",retry=2)
 
-        result['ans'] = ans.make_table()
-        result['unans'] = unans.make_table()
-
-        return result
+        return ans
     
     def dscv_arp(self, interface: str, subnet_cidr: str):
         """
@@ -191,9 +181,9 @@ class NetworkDiscovery(Network):
         #result, packet_list = srp(packet, timeout=3, iface=interface, verbose=0)[0]
         ans, packet_list = srp(packet, timeout=3, iface=interface, verbose=0)
         result = ans.make_table(lambda x:(x[Ether].src, x[ARP].psrc))
-
         self.logger.info(ans.summary(lambda s,r: r.sprintf("%Ether.src% %ARP.psrc%") ))
-        return result if result is not None else None
+
+        return ans
          
     def dscv_tcp(self, target: str, port=80):
         """
@@ -208,10 +198,11 @@ class NetworkDiscovery(Network):
             ans (list): list of answered packets
         """
     
-        ans, unans = sr( IP(dst=target)/TCP(dport=port,flags="S", options=[('Timestamp',(0,0))]) )
+        ans, packet_list = sr( IP(dst=target)/TCP(dport=port,flags="S", options=[('Timestamp',(0,0))]) )
         result = ans.make_table(lambda x:(x[IP].src))
         self.logger.info(ans.summary( lambda s,r : r.sprintf("%IP.src% is alive") ))
-        return result if result is not None else None
+
+        return ans
     
     def dscv_udp(self, target: str):
         """
@@ -224,12 +215,11 @@ class NetworkDiscovery(Network):
         Returns:
             ans (list): list of sent/received answered packets
         """
-        ans, unans = sr(IP(dst=target)/UDP(dport=0))
+        ans, packet_list = sr(IP(dst=target)/UDP(dport=0))
         result = ans.make_table(lambda x:(x[IP].src))
         self.logger.info(ans.summary( lambda s,r : r.sprintf("%IP.src% is alive") ))
-        #unans.summary()
 
-        return result if result is not None else None
+        return ans
     
     def dscv_dhcp(self, iface: str):
         """
