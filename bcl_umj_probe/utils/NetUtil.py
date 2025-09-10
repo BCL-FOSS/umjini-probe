@@ -107,18 +107,6 @@ class NetUtil():
 
         return devices
 
-    def net_discovery(self, iface: str, subnet: str):
-        network_map = self.full_discovery(interface=iface, subnet=subnet)
-        return network_map if isinstance(network_map, dict) else None
-    
-    def net_host_scan(self, action: str, params: dict):
-       ans, unans = self.discovery.scapy_scan(action=action, params=params)
-       return ans, unans if not None else None
-    
-    def get_remote_snmp(self, ip):
-        stats = self.snmp.collect_remote_snmp_stats(ip)
-        return stats if isinstance(stats, dict) else None
-
     async def background_survey(self):
         global surveying
         while surveying is True:

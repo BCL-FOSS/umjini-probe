@@ -31,6 +31,16 @@ def speedtest(mode: Annotated[str, "Sets the probe as either the speedtest clien
         result = net_test.start_iperf(mode=mode)
 
     return result
+
+@mcp.tool
+def traceroute_syn(destination: Annotated[str, "The server or endpoint to trace ."], remote_host: Annotated[str, "The server to conduct the speedtest with. Required only if the probe is set as the client."], ):
+    """Use to perform a TCP SYN traceroute to the spcified destination (server or endpoint) on the specified port (aka service)"""
+    routers = net_test.traceroute_syn()
+
+    for pkt in routers:
+        logger.info(pkt)
+
+    return routers
     
 
 @mcp.tool

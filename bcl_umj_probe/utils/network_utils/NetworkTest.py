@@ -35,32 +35,6 @@ class NetworkTest(Network):
                 client.verbose = verbose
                 client.reverse = reverse
                 result = client.run()
-
-                self.logger.info('')
-                self.logger.info('Test completed:')
-                self.logger.info('  started at         {0}'.format(result.time))
-                self.logger.info('  bytes transmitted  {0}'.format(result.bytes))
-                self.logger.info('  jitter (ms)        {0}'.format(result.jitter_ms))
-                self.logger.info('  avg cpu load       {0}%\n'.format(result.local_cpu_total))
-
-                self.logger.info('Average transmitted data in all sorts of networky formats:')
-                self.logger.info('  bits per second      (bps)   {0}'.format(result.bps))
-                self.logger.info('  Kilobits per second  (kbps)  {0}'.format(result.kbps))
-                self.logger.info('  Megabits per second  (Mbps)  {0}'.format(result.Mbps))
-                self.logger.info('  KiloBytes per second (kB/s)  {0}'.format(result.kB_s))
-                self.logger.info('  MegaBytes per second (MB/s)  {0}'.format(result.MB_s))
-
-                scan_result = {"test_start": result.time,
-                               "bytes_trans": result.bytes,
-                               "jitter": result.jitter_ms,
-                               "avg_cpu_load": result.local_cpu_total,
-                               "bps": result.bps,
-                               "kbitps": result.kbps,
-                               "mbitps": result.Mbps,
-                               "kbytps": result.kB_s,
-                               "mbytps": result.MB_s}
-
-                return result.error if result.error else scan_result
               
             case 'sr':
                 server = iperf3.Server()
@@ -74,35 +48,34 @@ class NetworkTest(Network):
                    result = server.run()
                    if isinstance(result, TestResult):
                        run = False
-
-                self.logger.info('')
-                self.logger.info('Test completed:')
-                self.logger.info('  started at         {0}'.format(result.time))
-                self.logger.info('  bytes transmitted  {0}'.format(result.bytes))
-                self.logger.info('  jitter (ms)        {0}'.format(result.jitter_ms))
-                self.logger.info('  avg cpu load       {0}%\n'.format(result.local_cpu_total))
-
-                self.logger.info('Average transmitted data in all sorts of networky formats:')
-                self.logger.info('  bits per second      (bps)   {0}'.format(result.bps))
-                self.logger.info('  Kilobits per second  (kbps)  {0}'.format(result.kbps))
-                self.logger.info('  Megabits per second  (Mbps)  {0}'.format(result.Mbps))
-                self.logger.info('  KiloBytes per second (kB/s)  {0}'.format(result.kB_s))
-                self.logger.info('  MegaBytes per second (MB/s)  {0}'.format(result.MB_s))
-
-                scan_result = {"test_start": result.time,
-                               "bytes_trans": result.bytes,
-                               "jitter": result.jitter_ms,
-                               "avg_cpu_load": result.local_cpu_total,
-                               "bps": result.bps,
-                               "kbitps": result.kbps,
-                               "mbitps": result.Mbps,
-                               "kbytps": result.kB_s,
-                               "mbytps": result.MB_s}
-                       
-                return scan_result
                 
             case _:
-                  return None
+                 pass
+            
+        self.logger.info('')
+        self.logger.info('Test completed:')
+        self.logger.info('  started at         {0}'.format(result.time))
+        self.logger.info('  bytes transmitted  {0}'.format(result.bytes))
+        self.logger.info('  jitter (ms)        {0}'.format(result.jitter_ms))
+        self.logger.info('  avg cpu load       {0}%\n'.format(result.local_cpu_total))
+        self.logger.info('Average transmitted data in all sorts of networky formats:')
+        self.logger.info('  bits per second      (bps)   {0}'.format(result.bps))
+        self.logger.info('  Kilobits per second  (kbps)  {0}'.format(result.kbps))
+        self.logger.info('  Megabits per second  (Mbps)  {0}'.format(result.Mbps))
+        self.logger.info('  KiloBytes per second (kB/s)  {0}'.format(result.kB_s))
+        self.logger.info('  MegaBytes per second (MB/s)  {0}'.format(result.MB_s))
+
+        scan_result = {"test_start": result.time,
+                        "bytes_trans": result.bytes,
+                        "jitter": result.jitter_ms,
+                        "avg_cpu_load": result.local_cpu_total,
+                        "bps": result.bps,
+                        "kbitps": result.kbps,
+                        "mbitps": result.Mbps,
+                        "kbytps": result.kB_s,
+                        "mbytps": result.MB_s}
+        
+        return scan_result
 
     def traceroute_syn(self, dest: str, port=80):
         """
@@ -119,9 +92,9 @@ class NetworkTest(Network):
         ans, unans = sr(IP(dst=dest,ttl=(1,10))/TCP(dport=port,flags="S", options=[('Timestamp',(0,0))]))
         #ans.summary(lambda s,r: r.sprintf("%IP.src%\t{ICMP:%ICMP.type%}\t{TCP:%TCP.flags%}"))
 
-        router_list = ans.make_table(lambda s,r: (s.dst, s.ttl, r.src))
+        self.logger.info(ans.make_table(lambda s,r: (s.dst, s.ttl, r.src)))
         
-        return router_list if not None else None
+        return ans
     
     def traceroute_udp(self, target: str, query: str ='google.com'):
         """
@@ -139,10 +112,10 @@ class NetworkTest(Network):
 
         #res, unans = sr(IP(dst=target, ttl=(1,20)) /UDP()/app)
 
-        res, unans = sr(IP(dst=target, ttl=(1,20))/UDP()/DNS(qd=DNSQR(qname=query)))
+        ans, unans = sr(IP(dst=target, ttl=(1,20))/UDP()/DNS(qd=DNSQR(qname=query)))
 
-        router_list = res.make_table(lambda s,r: (s.dst, s.ttl, r.src))
-        return router_list if not None else None
+        self.logger.info(ans.make_table(lambda s,r: (s.dst, s.ttl, r.src)))
+        return ans
     
     def traceroute_dns(self, target: list, query: str = 'google.com'):
         """
@@ -156,10 +129,10 @@ class NetworkTest(Network):
         Returns:
             router_list (str): list of routers identified during trace
         """
-        trc_result, packet_list = traceroute(target=target,l4=UDP(sport=RandShort())/DNS(qd=DNSQR(qname=query)))
+        ans, unans = traceroute(target=target,l4=UDP(sport=RandShort())/DNS(qd=DNSQR(qname=query)))
      
-        router_list = trc_result.make_lined_table(lambda s,r: (s.dst, r.src))
-        return router_list if not None else None
+        self.logger.info(ans.make_lined_table(lambda s,r: (s.dst, r.src)))
+        return ans
 
 
        
