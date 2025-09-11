@@ -50,7 +50,7 @@ class NetworkTest(Network):
                        run = False
                 
             case _:
-                 pass
+                pass
             
         self.logger.info('')
         self.logger.info('Test completed:')
@@ -77,7 +77,7 @@ class NetworkTest(Network):
         
         return scan_result
 
-    def traceroute_syn(self, dest: str, port=80):
+    def traceroute_syn(self, target: str, port:int=80):
         """
         SYN traceroute
 
@@ -89,7 +89,7 @@ class NetworkTest(Network):
         Returns:
             router_list (str): list of routers identified during trace
         """
-        ans, unans = sr(IP(dst=dest,ttl=(1,10))/TCP(dport=port,flags="S", options=[('Timestamp',(0,0))]))
+        ans, unans = sr(IP(dst=target,ttl=(1,10))/TCP(dport=port,flags="S", options=[('Timestamp',(0,0))]))
         #ans.summary(lambda s,r: r.sprintf("%IP.src%\t{ICMP:%ICMP.type%}\t{TCP:%TCP.flags%}"))
 
         self.logger.info(ans.make_table(lambda s,r: (s.dst, s.ttl, r.src)))
@@ -133,6 +133,8 @@ class NetworkTest(Network):
      
         self.logger.info(ans.make_lined_table(lambda s,r: (s.dst, r.src)))
         return ans
+    
+    
 
 
        

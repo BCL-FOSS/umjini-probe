@@ -33,9 +33,29 @@ def speedtest(mode: Annotated[str, "Sets the probe as either the speedtest clien
     return result
 
 @mcp.tool
-def traceroute_syn(destination: Annotated[str, "The server or endpoint to trace ."], remote_host: Annotated[str, "The server to conduct the speedtest with. Required only if the probe is set as the client."], ):
-    """Use to perform a TCP SYN traceroute to the spcified destination (server or endpoint) on the specified port (aka service)"""
-    routers = net_test.traceroute_syn()
+def traceroute_syn(target: Annotated[str, "The server or endpoint to trace."], port: Annotated[int, "The TCP port (or service) to test."], ):
+    """Use to trace the route from the host probe to the TCP application (or port) on the specified target."""
+    routers = net_test.traceroute_syn(target=target, port=port)
+
+    for pkt in routers:
+        logger.info(pkt)
+
+    return routers
+
+@mcp.tool
+def traceroute_dns(target: Annotated[str, "The server or endpoint to trace."], query: Annotated[str, "The domain to DNS query."], ):
+    """Use to trace the route taken by the DNS query to the specified target."""
+    routers = net_test.traceroute_dns(target=target, query=query)
+
+    for pkt in routers:
+        logger.info(pkt)
+
+    return routers
+
+@mcp.tool
+def traceroute_udp(target: Annotated[str, "The server or endpoint to trace."], query: Annotated[str, "The domain to run the DNS query trace on."], ):
+    """Use to trace the route from the host probe to the UDP application specified in the target. """
+    routers = net_test.traceroute_udp(target=target, query=query)
 
     for pkt in routers:
         logger.info(pkt)
@@ -43,7 +63,4 @@ def traceroute_syn(destination: Annotated[str, "The server or endpoint to trace 
     return routers
     
 
-@mcp.tool
-def wifi():
-    """WiFi analysis"""
 
