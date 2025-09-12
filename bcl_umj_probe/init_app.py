@@ -79,10 +79,19 @@ def init_probe():
     else:
         probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
         probe_data['api_key'] = bcrypt.hash(str(uuid.uuid4()))
-        logger.info(f"API Key for umjiniti probe {id}: {probe_data['api_key']}. Store this is a secure location as it will not be displayed again.")
-        logger.info(probe_data)
-        logger.info(probe_utils.get_ifaces())
-        return prb_id, hstnm, probe_data
+
+        # Store probe data
+        str_hashmap = {str(k): str(v) for k, v in probe_data.items()}
+        result = r.hset(prb_id, mapping=str_hashmap)
+        logger.info(result)
+
+        if isinstance(result, int):
+            logger.info(f"API Key for umjiniti probe {id}: {probe_data['api_key']}. Store this is a secure location as it will not be displayed again.")
+            logger.info(probe_data)
+            logger.info(probe_utils.get_ifaces())
+            return prb_id, hstnm, probe_data
+        else:
+            raise SystemExit(130)
 
 # Dependency function to validate the API key
 def validate_api_key(key: str = Depends(api_key_header)):
