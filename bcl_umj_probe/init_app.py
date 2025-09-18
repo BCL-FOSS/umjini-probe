@@ -103,6 +103,7 @@ def validate_api_key(key: str = Depends(api_key_header)):
             hash_data = r.hgetall(redis_key)
             logger.info(hash_data)
             stored_api_key = hash_data.get("api_key")
+            logger.info(stored_api_key)
 
             if not stored_api_key:
                 raise
