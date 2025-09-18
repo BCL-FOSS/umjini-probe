@@ -40,7 +40,7 @@ def init_probe():
         logger.info(result)
 
         if isinstance(result, int):
-            logger.info(f"API Key for umjiniti probe {id}: {api_key}. Store this is a secure location as it will not be displayed again.")
+            logger.info(f"API Key for umjiniti probe {id}: {api_key}\n Store this is a secure location as it will not be displayed again.")
             logger.info(probe_data)
             logger.info(probe_utils.get_ifaces())
             return prb_id, hstnm, probe_data
