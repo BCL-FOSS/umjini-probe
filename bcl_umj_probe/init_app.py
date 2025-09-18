@@ -5,14 +5,7 @@ from utils.network_utils.ProbeInfo import ProbeInfo
 import logging
 from passlib.hash import bcrypt
 from utils.RedisDB import RedisDB
-from utils.network_utils.ProbeInfo import ProbeInfo
-from utils.network_utils.NetworkDiscovery import NetworkDiscovery
-from utils.network_utils.NetworkTest import NetworkTest
-from utils.NetUtil import NetUtil
-from utils.network_utils.NetworkSNMP import NetworkSNMP
 import uuid
-from passlib.hash import bcrypt
-from typing import Callable
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
@@ -21,44 +14,6 @@ logger = logging.getLogger(__name__)
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 prb_db = RedisDB(hostname='localhost', port='6379')
 probe_utils = ProbeInfo()
-net_discovery = NetworkDiscovery()
-net_test = NetworkTest()
-net_utils = NetUtil(interface='')
-net_snmp = NetworkSNMP()
-
-prb_action_map: dict[str, Callable[[dict], object]] = {
-    "prbdta": probe_utils.get_probe_data,
-    "prbprc": probe_utils.get_processes_by_names,
-    "prbprt": probe_utils.open_listening_ports,
-    "prbifc": probe_utils.get_iface_ips,
-}
-
-dscv_action_map: dict[str, Callable[[dict], object]] = {
-    "dscv_full": net_utils.full_discovery,
-    "scan_ack": net_discovery.scan_ack,
-    "scan_ip": net_discovery.scan_ip,
-    "scan_xmas": net_discovery.scan_xmas,
-    "dscv_arp": net_discovery.dscv_arp,
-    "dscv_dhcp": net_discovery.dscv_dhcp,
-    "dscv_tcp": net_discovery.dscv_tcp,
-    "dscv_udp": net_discovery.dscv_udp,
-}
-
-net_test_action_map: dict[str, Callable[[dict], object]] = {
-    "spdtst": net_test.start_iperf,
-    "trcrt_dns": net_test.traceroute_dns,
-    "trcrt_syn": net_test.traceroute_syn,
-    "trcrt_udp": net_test.traceroute_udp,
-}
-
-wifi_action_map: dict[str, Callable[[dict], object]] = {
-    "wifi_srvy_on": net_utils.start_survey,
-    "wifi_srvy_off": net_utils.stop_survey,
-    "wifi_srvy_rprt": net_utils.generate_report,
-    "wifi_srvy_json": net_utils.get_survey_json,
-}
-
-snmp_action_map: dict[str, Callable[[dict], object]] = {}
 
 # local Redis DB Init
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
@@ -94,7 +49,6 @@ def init_probe():
         else:
             raise SystemExit(130)
 
-# Dependency function to validate the API key
 def validate_api_key(key: str = Depends(api_key_header)):
     _, hostname = probe_utils.gen_probe_register_data()
     cursor, keys = r.scan(cursor=0, match=f'*{hostname}*')

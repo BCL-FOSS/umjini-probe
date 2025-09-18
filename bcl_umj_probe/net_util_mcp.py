@@ -1,16 +1,20 @@
 from fastmcp import FastMCP
-from init_app import (
-    logger,
-    net_test,
-    net_discovery,
-    net_snmp,
-    net_utils
-    )
 from typing import Annotated
-from typing import Callable
-import inspect
+from utils.network_utils.NetworkDiscovery import NetworkDiscovery
+from utils.network_utils.NetworkTest import NetworkTest
+from utils.NetUtil import NetUtil
+from utils.network_utils.NetworkSNMP import NetworkSNMP
+import logging
 
 mcp = FastMCP(name="Network Util MCP")
+net_discovery = NetworkDiscovery()
+net_test = NetworkTest()
+net_utils = NetUtil(interface='')
+net_snmp = NetworkSNMP()
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger('passlib').setLevel(logging.ERROR)
+logger = logging.getLogger(__name__)
 
 @mcp.tool
 async def network_discovery(action: Annotated[str, "The type of network scan to run. The scan types are arp, tcp & udp."], iface: Annotated[str, "The network interface to run the network scan from"], subnet: Annotated[str, "The subnet/VLAN to run the network device discovery scan in"]):

@@ -1,14 +1,15 @@
 from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from init_app import (
-    logger,
     validate_api_key,
-    prb_action_map,
     init_probe
 )
 import httpx
 from net_util_mcp import mcp
 from contextlib import asynccontextmanager
+from utils.network_utils.ProbeInfo import ProbeInfo
+from typing import Callable
+import logging
 
 class Init(BaseModel):
     api_key: str
@@ -24,6 +25,18 @@ class ToolCall(BaseModel):
 prb_id = None
 hstnm = None
 probe_data = None
+probe_utils = ProbeInfo()
+
+prb_action_map: dict[str, Callable[[dict], object]] = {
+    "prbdta": probe_utils.get_probe_data,
+    "prbprc": probe_utils.get_processes_by_names,
+    "prbprt": probe_utils.open_listening_ports,
+    "prbifc": probe_utils.get_iface_ips,
+}
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger('passlib').setLevel(logging.ERROR)
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
