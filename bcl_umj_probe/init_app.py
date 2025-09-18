@@ -15,7 +15,6 @@ api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 prb_db = RedisDB(hostname='localhost', port='6379')
 probe_utils = ProbeInfo()
 
-# local Redis DB Init
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 pong = r.ping()
 logger.info(f"Redis ping: {pong}")
@@ -36,7 +35,6 @@ def init_probe():
         api_key = uuid.uuid4()
         probe_data['api_key'] = bcrypt.hash(str(api_key))
 
-        # Store probe data
         str_hashmap = {str(k): str(v) for k, v in probe_data.items()}
         result = r.hset(prb_id, mapping=str_hashmap)
         logger.info(result)
@@ -70,29 +68,3 @@ def validate_api_key(key: str = Depends(api_key_header)):
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid or missing API key"
                 )
-"""
-def validate_api_key(key: str = Depends(api_key_header)):
-    r = redis.Redis(host='localhost', port=6379)
-    pong = r.ping()
-    logger.info(pong)
-    cursor = b'0'
-    id, hostname = probe_utils.gen_probe_register_data()
-    cursor, keys = r.scan(cursor=cursor, match=f'*{hostname}*')
-    if keys:
-        all_data = {}
-        for key in keys:
-                # Retrieve hash data for each key
-            hash_data = r.hgetall(key)
-            all_data[key] = {k: v for k, v in hash_data.items()}
-            logger.info(all_data.items())
-
-        if bcrypt.verify(key, hash=all_data['api_key']) is False:
-            raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or missing API key"
-                )
-        else:
-            return key
-
-"""
-#prb_id, hstnm, probe_data = init_probe()
