@@ -78,7 +78,8 @@ def init_probe():
         return prb_id, hstnm, probe_data
     else:
         probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
-        probe_data['api_key'] = bcrypt.hash(str(uuid.uuid4()))
+        api_key = uuid.uuid4()
+        probe_data['api_key'] = bcrypt.hash(str(api_key))
 
         # Store probe data
         str_hashmap = {str(k): str(v) for k, v in probe_data.items()}
@@ -86,7 +87,7 @@ def init_probe():
         logger.info(result)
 
         if isinstance(result, int):
-            logger.info(f"API Key for umjiniti probe {id}: {probe_data['api_key']}. Store this is a secure location as it will not be displayed again.")
+            logger.info(f"API Key for umjiniti probe {id}: {api_key}. Store this is a secure location as it will not be displayed again.")
             logger.info(probe_data)
             logger.info(probe_utils.get_ifaces())
             return prb_id, hstnm, probe_data
