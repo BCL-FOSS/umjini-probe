@@ -10,7 +10,7 @@ from typing import Annotated
 from typing import Callable
 import inspect
 
-mcp = FastMCP(name="UniFiAutomation")
+mcp = FastMCP(name="Network Util MCP")
 
 @mcp.tool
 async def network_discovery(action: Annotated[str, "The type of network scan to run. The scan types are arp, tcp & udp."], iface: Annotated[str, "The network interface to run the network scan from"], subnet: Annotated[str, "The subnet/VLAN to run the network device discovery scan in"]):

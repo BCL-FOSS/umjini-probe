@@ -141,4 +141,4 @@ def validate_api_key(key: str = Depends(api_key_header)):
             return key
 
 """
-prb_id, hstnm, probe_data = init_probe()
+#prb_id, hstnm, probe_data = init_probe()

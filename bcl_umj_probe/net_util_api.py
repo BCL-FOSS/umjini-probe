@@ -3,13 +3,12 @@ from pydantic import BaseModel
 from init_app import (
     logger,
     validate_api_key,
-    prb_db,
-    probe_data,
-    prb_id,
-    prb_action_map
+    prb_action_map,
+    init_probe
 )
 import httpx
 from net_util_mcp import mcp
+from contextlib import asynccontextmanager
 
 class Init(BaseModel):
     api_key: str
@@ -22,8 +21,19 @@ class ToolCall(BaseModel):
     action: str 
     params: dict 
 
+prb_id = None
+hstnm = None
+probe_data = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global prb_id, hstnm, probe_data
+    prb_id, hstnm, probe_data = init_probe()
+    logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
+    yield
+
 mcp_app = mcp.http_app(path="/mcp")
-api = FastAPI(title='Network Util API', lifespan=mcp_app.lifespan)
+api = FastAPI(title='Network Util API', lifespan=lifespan)
 
 async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: dict = {}, cookies: str = ''):
     async with httpx.AsyncClient() as client:
