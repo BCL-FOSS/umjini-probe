@@ -63,6 +63,7 @@ def status():
 @api.post("/api/init", dependencies=[Depends(validate_api_key)])
 async def init(init_data: Init):
     async def enrollment(payload: dict = {}):
+        logger.info(init_data)
         headers = {"X-UMJ-WFLW-API-KEY": init_data.api_key}
         post_headers = {"X-UMJ-WFLW-API-KEY": init_data.api_key,
                         "Content-Type": "application/json"}
