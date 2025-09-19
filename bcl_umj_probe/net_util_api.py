@@ -67,8 +67,8 @@ async def init(init_data: Init):
         post_headers = {"X-UMJ-WFLW-API-KEY": init_data.api_key,
                         "Content-Type": "application/json"}
 
-        init_url = f"{init_data.url}/init?usr={init_data.usr}"
-        enroll_url = f"{init_data.url}/enroll?usr={init_data.usr}&site={init_data.site}"
+        init_url = f"https://{init_data.url}/init?usr={init_data.usr}"
+        enroll_url = f"https://{init_data.url}/enroll?usr={init_data.usr}&site={init_data.site}"
 
         resp_data = await _make_http_request(cmd="g", url=init_url, headers=headers)
         if resp_data.status_code == 200:
