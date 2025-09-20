@@ -37,11 +37,6 @@ install_py_dependencies() {
             sudo dnf update -y
             PACKAGE_MANAGER="dnf"
             ;;
-        freebsd)
-            sudo pkg bootstrap -y
-            sudo pkg install bash -y
-            sudo pkg update -y
-            ;;
         *)
             echo "Unknown or unsupported distribution. Exiting."
             exit 1
@@ -49,19 +44,7 @@ install_py_dependencies() {
     esac
 
     echo "Install python-venv if not installed already"
-    case "$DISTRO" in
-        debian|ubuntu|rhel|centos|fedora|rocky|almalinux)
-            sudo $PACKAGE_MANAGER install -y python3.12-venv
-            ;;
-        freebsd)
-            PYBIN="$(command -v python3 || command -v python)"
-            "$PYBIN" -m pip install --user virtualenv
-            ;;
-        *)
-            echo "Unknown or unsupported distribution. Exiting."
-            exit 1
-            ;;
-    esac
+    sudo $PACKAGE_MANAGER install -y python3.12-venv
 
     echo "⚙️ Creating Python venv inside build staging..."
     sudo python3 -m venv "$BUILD_DIR/venv"
