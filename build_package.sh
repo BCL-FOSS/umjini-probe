@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 WRKDIR="$(cd "$(dirname "$0")" && pwd)"
@@ -38,9 +38,9 @@ install_py_dependencies() {
             PACKAGE_MANAGER="dnf"
             ;;
         freebsd)
+            sudo pkg bootstrap -y
+            sudo pkg install bash -y
             sudo pkg update -y
-            PACKAGE_MANAGER="pkg"
-            PACKAGE_LIST="py39-virtualenv"
             ;;
         *)
             echo "Unknown or unsupported distribution. Exiting."
@@ -54,7 +54,8 @@ install_py_dependencies() {
             sudo $PACKAGE_MANAGER install -y python3.12-venv
             ;;
         freebsd)
-            sudo $PACKAGE_MANAGER install -y $PACKAGE_LIST
+            PYBIN="$(command -v python3 || command -v python)"
+            "$PYBIN" -m pip install --user virtualenv
             ;;
         *)
             echo "Unknown or unsupported distribution. Exiting."

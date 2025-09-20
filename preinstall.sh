@@ -38,14 +38,31 @@ open_firewall_port() {
             fi
             ;;
         freebsd)
-            if [ -f /etc/pf.conf ]; then
-                if ! grep -q "port 8000" /etc/pf.conf; then
-                    echo "pass in proto tcp from any to any port 8000" | sudo tee -a /etc/pf.conf
-                    sudo service pf reload
-                    echo "Port 8000 opened in pf firewall."
+            if pfctl -s info >/dev/null 2>&1 && pfctl -s info | grep -q "Status: Enabled"; then
+                echo "[i] pf detected — updating /etc/pf.conf..."
+                if ! grep -Fq "port 8000" /etc/pf.conf; then
+                echo "pass in quick proto tcp to any port 8000" >> /etc/pf.conf
+                pfctl -f /etc/pf.conf
+                echo "[i] pf rule added and reloaded."
+                else
+                echo "[i] pf already has a rule for port 8000."
                 fi
+
+            elif command -v ipfw >/dev/null 2>&1; then
+                echo "[i] ipfw detected — adding persistent rule..."
+                RULE="allow tcp from any to any 8000 in"
+                if ! grep -Fq "$RULE" /etc/ipfw.rules 2>/dev/null; then
+                echo "$RULE" >> /etc/ipfw.rules
+                fi
+                # Ensure ipfw loads rules from file
+                sysrc firewall_enable="YES"
+                sysrc firewall_script="/etc/ipfw.rules"
+                # Load rules now
+                ipfw add 5000 $RULE || true
+                echo "[i] ipfw rule applied and persisted in /etc/ipfw.rules"
+
             else
-                echo "pf not configured. Skipping firewall rule."
+                echo "[w] No pf or ipfw firewall detected — please configure manually."
             fi
             ;;
         *)
@@ -81,6 +98,10 @@ install_dependencies() {
 
             PACKAGE_MANAGER="apt"
             PACKAGE_LIST="tshark tcpdump gpsd gpsd-clients iputils-ping iperf3 aircrack-ng libpcap-dev p0f traceroute graphviz"
+
+            echo "Installing packages: $PACKAGE_LIST"
+            sudo $PACKAGE_MANAGER install -y $PACKAGE_LIST
+
             ;;
         rhel|centos|fedora|rocky|almalinux)
             sudo dnf update -y
@@ -95,28 +116,33 @@ install_dependencies() {
             fi
             PACKAGE_MANAGER="dnf"
             PACKAGE_LIST="tshark tcpdump gpsd gpsd-clients iputils-ping iperf3 aircrack-ng libpcap-dev p0f traceroute graphviz"
+
+            echo "Installing packages: $PACKAGE_LIST"
+            sudo $PACKAGE_MANAGER install -y $PACKAGE_LIST
+
             ;;
         freebsd)
+            sudo pkg bootstrap -y
+            sudo pkg install bash -y
             sudo pkg update -y
             if ! command -v redis > /dev/null 2>&1; then
                 echo "Redis is not installed. Installing Redis..."
-                sudo pkg install -y redis
+                sudo pkg install redis -y
 
                 sudo service redis enable
                 sudo service redis start
             fi
             PACKAGE_MANAGER="pkg"
             PACKAGE_LIST="tshark tcpdump gpsd gpsd-clients iputils-ping iperf3 aircrack-ng libpcap-dev p0f traceroute"
+
+            echo "Installing packages: $PACKAGE_LIST"
+            sudo $PACKAGE_MANAGER install $PACKAGE_LIST -y
             ;;
         *)
             echo "Unknown or unsupported distribution. Exiting."
             exit 1
             ;;
     esac
-
-    # Install all necessary packages for probe
-    echo "Installing packages: $PACKAGE_LIST"
-    sudo $PACKAGE_MANAGER install -y $PACKAGE_LIST
 
     # Python setup
     echo "Checking for Python installation..."
@@ -125,28 +151,40 @@ install_dependencies() {
         case "$DISTRO" in
             debian|ubuntu) sudo apt install -y python3 ;;
             rhel|centos|fedora|rocky|almalinux) sudo yum install -y python3 || sudo dnf install -y python3 ;;
-            freebsd) sudo pkg install -y python3 ;;
+            freebsd) sudo pkg install python -y ;;
         esac
     fi
 
-    # pip3 setup
-    if ! command -v pip3 > /dev/null 2>&1; then
+    # pip setup
+    if ! command -v pip3 >/dev/null 2>&1 || ! command -v pip >/dev/null 2>&1; then
         echo "Installing pip3..."
         case "$DISTRO" in
             debian|ubuntu) sudo apt install -y python3-pip ;;
             rhel|centos|fedora|rocky|almalinux) sudo yum install -y python3-pip || sudo dnf install -y python3-pip ;;
-            freebsd) sudo pkg install -y py39-pip ;;
+            freebsd) 
+                PYBIN="$(command -v python3 || command -v python)"
+
+                if pkg search -q '^py311-pip$'; then
+                    sudo pkg install py311-pip -y
+                elif pkg search -q '^py310-pip$'; then
+                    sudo pkg install py310-pip -y
+                else
+                    "$PYBIN" -m ensurepip --upgrade || true
+                    "$PYBIN" -m pip install --upgrade pip || true
+                fi
+                ;;
         esac
     fi
 
     # python3-venv setup
     echo "Checking for python3-venv installation..."
-    if ! python3 -m venv --help > /dev/null 2>&1; then
+    PYBIN="$(command -v python3 || command -v python)"
+    if ! python3 -m venv > /dev/null 2>&1 || ! "$PYBIN" -c "import venv" 2>/dev/null; then
         echo "Installing python3.12-venv..."
         case "$DISTRO" in
             debian|ubuntu) sudo apt install -y python3.12-venv ;;
             rhel|centos|fedora|rocky|almalinux) sudo yum install -y python3.12-venv || sudo dnf install -y python3.12-venv ;;
-            freebsd) sudo pkg install -y py39-virtualenv ;;
+            freebsd) "$PYBIN" -m pip install --user virtualenv ;;
         esac
     fi
 
