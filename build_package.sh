@@ -33,10 +33,6 @@ install_py_dependencies() {
             sudo apt update -y
             PACKAGE_MANAGER="apt"
             ;;
-        rhel|centos|fedora|rocky|almalinux)
-            sudo dnf update -y
-            PACKAGE_MANAGER="dnf"
-            ;;
         *)
             echo "Unknown or unsupported distribution. Exiting."
             exit 1
@@ -54,10 +50,6 @@ install_py_dependencies() {
 
     echo "Installation of dependencies completed."
 }
-
-
-
-
 
 DISTRIBUTION=$(get_distro)
 install_py_dependencies "$DISTRIBUTION"

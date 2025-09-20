@@ -28,15 +28,6 @@ open_firewall_port() {
                 echo "iptables not installed. Skipping iptables rule."
             fi
             ;;
-        rhel|centos|fedora|rocky|almalinux)
-            if systemctl is-active --quiet firewalld; then
-                sudo firewall-cmd --permanent --add-port=8000/tcp
-                sudo firewall-cmd --reload
-                echo "Port 8000 opened in firewalld."
-            else
-                echo "firewalld not active. Skipping firewall rule."
-            fi
-            ;;
         *)
             echo "Unknown or unsupported distribution. Skipping firewall setup."
             ;;
@@ -71,21 +62,6 @@ install_dependencies() {
             PACKAGE_MANAGER="apt"
             PACKAGE_LIST="tshark tcpdump gpsd gpsd-clients iputils-ping iperf3 aircrack-ng libpcap-dev p0f traceroute graphviz"
             ;;
-        rhel|centos|fedora|rocky|almalinux)
-            sudo dnf update
-
-            if ! command -v redis > /dev/null 2>&1; then
-                echo "Installing redis..."
-                sudo yum install redis || sudo dnf install redis
-
-                sudo systemctl enable redis
-                sudo systemctl start redis
-            else
-                echo "traceroute is already installed."
-            fi
-            PACKAGE_MANAGER="dnf"
-            PACKAGE_LIST="tshark tcpdump gpsd gpsd-clients iputils-ping iperf3 aircrack-ng libpcap-dev p0f traceroute graphviz"
-            ;;
         *)
             echo "Unknown or unsupported distribution. Exiting."
             exit 1
@@ -101,7 +77,10 @@ install_dependencies() {
         echo "Installing Python3..."
         case "$DISTRO" in
             debian|ubuntu) sudo apt install -y python3 ;;
-            rhel|centos|fedora|rocky|almalinux) sudo yum install -y python3 || sudo dnf install -y python3 ;;
+            *)
+                echo "Unknown or unsupported distribution. Exiting."
+                exit 1  
+                ;;
         esac
     fi
 
@@ -110,7 +89,10 @@ install_dependencies() {
         echo "Installing pip3..."
         case "$DISTRO" in
             debian|ubuntu) sudo apt install -y python3-pip ;;
-            rhel|centos|fedora|rocky|almalinux) sudo yum install -y python3-pip || sudo dnf install -y python3-pip ;;
+            *)
+                echo "Unknown or unsupported distribution. Exiting."
+                exit 1
+                ;;
         esac
     fi
 
@@ -120,7 +102,10 @@ install_dependencies() {
         echo "Installing python3.12-venv..."
         case "$DISTRO" in
             debian|ubuntu) sudo apt install -y python3.12-venv ;;
-            rhel|centos|fedora|rocky|almalinux) sudo yum install -y python3.12-venv || sudo dnf install -y python3.12-venv ;;
+            *)
+                echo "Unknown or unsupported distribution. Exiting."
+                exit 1
+                ;;
         esac
     fi
 
