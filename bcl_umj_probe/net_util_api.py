@@ -5,7 +5,6 @@ from init_app import (
     init_probe
 )
 import httpx
-from net_util_mcp import mcp
 from contextlib import asynccontextmanager
 from utils.network_utils.ProbeInfo import ProbeInfo
 from typing import Callable
@@ -45,7 +44,6 @@ async def lifespan(app: FastAPI):
     logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
     yield
 
-mcp_app = mcp.http_app(path="/mcp")
 api = FastAPI(title='Network Util API', lifespan=lifespan)
 
 async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: dict = {}, cookies: str = ''):

@@ -5,8 +5,20 @@ from utils.network_utils.NetworkTest import NetworkTest
 from utils.NetUtil import NetUtil
 from utils.network_utils.NetworkSNMP import NetworkSNMP
 import logging
+from net_util_api import validate_api_key
+from fastmcp.server.auth import TokenVerifier
 
-mcp = FastMCP(name="Network Util MCP")
+class ApiKeyVerifier(TokenVerifier):
+    def __init__(self, *, header_name: str = "x-api-key"):
+        super().__init__(...)
+        self.header_name = header_name
+
+    def verify(self, token: str):
+        validate_api_key(key=token)
+
+auth = ApiKeyVerifier()
+mcp = FastMCP(name="Network Util MCP", auth=auth)
+mcp_app = mcp.http_app(path="/mcp")
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
 net_utils = NetUtil(interface='')

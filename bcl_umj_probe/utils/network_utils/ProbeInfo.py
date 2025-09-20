@@ -30,6 +30,8 @@ import platform
 import subprocess
 import socket
 import psutil
+import dns.resolver
+import dns.reversename
 
 
 class ProbeInfo(Network):
@@ -63,9 +65,12 @@ class ProbeInfo(Network):
     
     def collect_local_stats(self, id: str, hostname: str):
         stat_data = {}
+        ip = self.get_public_ip()
 
         stat_data["prb_id"] = id
         stat_data["hstnm"] = hostname
+        stat_data["ip"] = ip
+        stat_data["url"] = self.get_url_from_ip(ip_address=ip)
 
         self.logger.info("\n📍 Local System Stats")
         stat_data["sys"] = f"{platform.system()} {platform.release()}"
@@ -78,17 +83,14 @@ class ProbeInfo(Network):
         stat_data["upt"] = uptime
         stat_data["ifcs"] = {}
 
-        # Network interfaces
         self.logger.info("\n🔌 Interface Statistics:")
         for iface, addrs in psutil.net_if_addrs().items():
-            # Skip loopback
             if iface in ("lo", "lo0"):
                 continue
 
             stats = psutil.net_if_stats().get(iface)
             io = psutil.net_io_counters(pernic=True).get(iface)
 
-            # Ensure dict exists
             stat_data["ifcs"][iface] = {}
 
             if stats:
@@ -109,7 +111,6 @@ class ProbeInfo(Network):
                     f"Recv Packets: {io.packets_recv}"
                 )
 
-            # Logging per interface
             self.logger.info(f"Interface: {iface}")
             if stats:
                 self.logger.info(f"  Speed: {stats.speed} Mbps")
@@ -121,7 +122,34 @@ class ProbeInfo(Network):
                 )
 
         return stat_data if stat_data else None
+        
+    def get_url_from_ip(self, ip_address: str, port: int | None = 8000, timeout: int = 2) -> str:
+        host = ip_address
 
+        fqdn = socket.getfqdn(ip_address)
+        if fqdn and fqdn != ip_address:
+            host = fqdn
+     
+        if host == ip_address:
+            rev_name = dns.reversename.from_address(ip_address)
+            answers = dns.resolver.resolve(rev_name, "PTR")
+            host = str(answers[0]).rstrip(".")
+
+        scheme = "http"
+        test_ports = [443, 80] if port is None else [port]
+
+        for test_port in test_ports:
+            with socket.create_connection((ip_address, test_port), timeout=timeout):
+                if test_port == 443:
+                    scheme = "https"
+                else:
+                    scheme = "http"
+                port = test_port
+                break
+            
+        if port in (80, 443):
+            return f"{scheme}://{host}"
+        return f"{scheme}://{host}:{port}"
     
     def get_public_ip(self) -> str:
         """
