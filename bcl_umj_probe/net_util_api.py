@@ -45,8 +45,8 @@ async def lifespan(app: FastAPI):
     logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
     yield
 
-api = FastAPI(title='Network Util API', lifespan=lifespan)
 mcp_app = mcp.http_app(path="/mcp")
+api = FastAPI(title='Network Util API', lifespan=lifespan)
 
 async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: dict = {}, cookies: str = ''):
     async with httpx.AsyncClient() as client:
