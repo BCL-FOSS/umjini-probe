@@ -16,6 +16,7 @@ class Init(BaseModel):
     usr: str
     url: str
     site: str
+    probe_url: str
     enroll: bool
 
 class ToolCall(BaseModel):
@@ -87,6 +88,8 @@ async def init(init_data: Init):
 
     if init_data.enroll is False or not (init_data.api_key and init_data.usr and init_data.url and init_data.site):
         return 400
+    
+    probe_data['url'] = init_data.probe_url
 
     if await enrollment(payload=probe_data) != 200:
         return {"Error": "occurred during probe adoption"}, 400
