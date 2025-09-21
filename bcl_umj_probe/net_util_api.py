@@ -90,6 +90,7 @@ async def init(init_data: Init):
         return 400
     
     probe_data['url'] = init_data.probe_url
+    logger.info(probe_data)
 
     if await enrollment(payload=probe_data) != 200:
         return {"Error": "occurred during probe adoption"}, 400

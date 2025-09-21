@@ -21,7 +21,6 @@ VENV_BIN = PROBE_DIR / "venv" / "bin"
 UVICORN_APP = "app:api"
 UVICORN_HOST = "0.0.0.0"
 UVICORN_PORT = "8000"
-UVICORN_WORKERS = "1"
 UVICORN_LOG_LEVEL = "info"
 
 def require_tool(name: str) -> bool:
