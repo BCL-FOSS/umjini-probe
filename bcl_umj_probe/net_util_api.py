@@ -7,6 +7,9 @@ from init_app import (
 import httpx
 from contextlib import asynccontextmanager
 from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.network_utils.NetworkDiscovery import NetworkDiscovery
+from utils.network_utils.NetworkTest import NetworkTest
+from utils.NetUtil import NetUtil
 from typing import Callable
 import logging
 from net_util_mcp import mcp
@@ -27,6 +30,9 @@ prb_id = None
 hstnm = None
 probe_data = None
 probe_utils = ProbeInfo()
+net_discovery = NetworkDiscovery()
+net_test = NetworkTest()
+net_utils = NetUtil(interface='')
 
 prb_action_map: dict[str, Callable[[dict], object]] = {
     "prbdta": probe_utils.get_probe_data,
@@ -98,7 +104,7 @@ async def init(init_data: Init):
         return 200
         
 @api.post("/api/probe", dependencies=[Depends(validate_api_key)])
-def prb(tool_data: ToolCall):
+def probe(tool_data: ToolCall):
     """Host system data"""
     handler = prb_action_map.get(tool_data.action)
     if handler and tool_data.params is not None:
