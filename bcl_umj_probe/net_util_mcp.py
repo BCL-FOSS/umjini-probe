@@ -4,9 +4,23 @@ from utils.network_utils.NetworkDiscovery import NetworkDiscovery
 from utils.network_utils.NetworkTest import NetworkTest
 from utils.NetUtil import NetUtil
 from utils.network_utils.NetworkSNMP import NetworkSNMP
+from utils.network_utils.ProbeInfo import ProbeInfo
 import logging
-from net_util_api import validate_api_key
 from fastmcp.server.auth import TokenVerifier
+import redis
+import logging
+from fastapi import HTTPException, status
+from passlib.hash import bcrypt
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger('passlib').setLevel(logging.ERROR)
+logger = logging.getLogger(__name__)
+
+probe_utils = ProbeInfo()
+
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+pong = r.ping()
+logger.info(f"Redis ping: {pong}")
 
 class ApiKeyVerifier(TokenVerifier):
     def __init__(self, *, header_name: str = "x-api-key"):
@@ -14,11 +28,30 @@ class ApiKeyVerifier(TokenVerifier):
         self.header_name = header_name
 
     def verify(self, token: str):
-        validate_api_key(key=token)
+        _, hostname = probe_utils.gen_probe_register_data()
+        cursor, keys = r.scan(cursor=0, match=f'*{hostname}*')
+
+        if keys:
+            for redis_key in keys:
+                hash_data = r.hgetall(redis_key)
+                logger.info(hash_data)
+                stored_api_key = hash_data.get("api_key")
+                logger.info(stored_api_key)
+
+                if not stored_api_key:
+                    raise
+
+                if bcrypt.verify(token, stored_api_key):
+                    return 200
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid or missing API key"
+                    )
 
 auth = ApiKeyVerifier()
 mcp = FastMCP(name="Network Util MCP", auth=auth)
-mcp_app = mcp.http_app(path="/mcp")
+
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
 net_utils = NetUtil(interface='')
@@ -34,7 +67,6 @@ async def network_discovery(action: Annotated[str, "The type of network scan to 
     discovered_devices = await net_utils.full_discovery(action=action, interface=iface, subnet=subnet)
 
     return discovered_devices
-
 
 @mcp.tool
 def speedtest(mode: Annotated[str, "Sets the probe as either the speedtest client or server. To set as server use 'sr'. To set as the client use 'cl'."], remote_host: Annotated[str, "The server to conduct the speedtest with. Required only if the probe is set as the client."], duration: Annotated[int, "Set the duration of the speedtest. Default is set as 30 seconds."], reverse: Annotated[bool, "Toggle the direction of the speedtest. Default is set to False, which performs a speedtest from client to server"], protocol: Annotated[bool, "Set the protocol of the test. Use False to run a TCP speedtest or True to run a UDP speedtest. Only required if the probe is set as the speedtest client."]):

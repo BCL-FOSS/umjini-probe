@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from utils.network_utils.ProbeInfo import ProbeInfo
 from typing import Callable
 import logging
+from net_util_mcp import mcp
 
 class Init(BaseModel):
     api_key: str
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI):
     yield
 
 api = FastAPI(title='Network Util API', lifespan=lifespan)
+mcp_app = mcp.http_app(path="/mcp")
 
 async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: dict = {}, cookies: str = ''):
     async with httpx.AsyncClient() as client:
