@@ -20,6 +20,7 @@ class Init(BaseModel):
     url: str
     site: str
     probe_url: str
+    probe_api_key: str
     enroll: bool
 
 class ToolCall(BaseModel):
@@ -96,6 +97,7 @@ async def init(init_data: Init):
         return 400
     
     probe_data['url'] = init_data.probe_url
+    probe_data['prb_api_key'] = init_data.probe_api_key
     logger.info(probe_data)
 
     if await enrollment(payload=probe_data) != 200:
