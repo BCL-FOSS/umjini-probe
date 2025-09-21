@@ -6,11 +6,11 @@ from utils.NetUtil import NetUtil
 from utils.network_utils.NetworkSNMP import NetworkSNMP
 from utils.network_utils.ProbeInfo import ProbeInfo
 import logging
-from fastmcp.server.auth import TokenVerifier
 import redis
-import logging
 from fastapi import HTTPException, status
 from passlib.hash import bcrypt
+from fastmcp import FastMCP, Context
+from fastmcp.server.dependencies import get_http_headers
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
@@ -22,48 +22,48 @@ r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 pong = r.ping()
 logger.info(f"Redis ping: {pong}")
 
-class ApiKeyVerifier(TokenVerifier):
-    def __init__(self, *, header_name: str = "x-api-key"):
-        super().__init__(...)
-        self.header_name = header_name
+def verify_api(headers: dict[str, str]) -> None:
+    key = headers.get("x-api-key")
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing API key in tool call"
+        )
+    _, hostname = probe_utils.gen_probe_register_data()
+    cursor, keys = r.scan(cursor=0, match=f'*{hostname}*')
 
-    def verify(self, token: str):
-        _, hostname = probe_utils.gen_probe_register_data()
-        cursor, keys = r.scan(cursor=0, match=f'*{hostname}*')
+    if keys:
+        for redis_key in keys:
+            hash_data = r.hgetall(redis_key)
+            logger.info(hash_data)
+            stored_api_key = hash_data.get("api_key")
+            logger.info(stored_api_key)
 
-        if keys:
-            for redis_key in keys:
-                hash_data = r.hgetall(redis_key)
-                logger.info(hash_data)
-                stored_api_key = hash_data.get("api_key")
-                logger.info(stored_api_key)
-
-                if not stored_api_key:
-                    raise
-
-                if bcrypt.verify(token, stored_api_key):
-                    return 200
-                else:
-                    raise HTTPException(
+            if not stored_api_key:
+                raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="Invalid or missing API key"
-                    )
+                )
 
-auth = ApiKeyVerifier()
-mcp = FastMCP(name="Network Util MCP", auth=auth)
+            if bcrypt.verify(key, stored_api_key):
+                return 200
+            else:
+                raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid or missing API key"
+                )
 
+mcp = FastMCP(name="Network Util MCP")
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
 net_utils = NetUtil(interface='')
 net_snmp = NetworkSNMP()
 
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger('passlib').setLevel(logging.ERROR)
-logger = logging.getLogger(__name__)
-
 @mcp.tool
-async def network_discovery(action: Annotated[str, "The type of network scan to run. The scan types are arp, tcp & udp."], iface: Annotated[str, "The network interface to run the network scan from"], subnet: Annotated[str, "The subnet/VLAN to run the network device discovery scan in"]):
+async def network_discovery(action: Annotated[str, "The type of network scan to run. The scan types are arp, tcp & udp."], iface: Annotated[str, "The network interface to run the network scan from"], subnet: Annotated[str, "The subnet/VLAN to run the network device discovery scan in"], ctx: Context, headers: get_http_headers):
     """Use for network device discovery within the specified subnet and network interface"""
+    verify_api(headers)
+
     discovered_devices = await net_utils.full_discovery(action=action, interface=iface, subnet=subnet)
 
     return discovered_devices
