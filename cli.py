@@ -73,7 +73,6 @@ def run_uvicorn_in_venv() -> int:
         UVICORN_APP,
         "--host", UVICORN_HOST,
         "--port", UVICORN_PORT,
-        "--workers", UVICORN_WORKERS,
         "--log-level", UVICORN_LOG_LEVEL,
     ]
     return run_cmd(cmd, cwd=PROBE_DIR)
