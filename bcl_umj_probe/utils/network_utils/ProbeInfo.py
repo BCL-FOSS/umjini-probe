@@ -65,12 +65,8 @@ class ProbeInfo(Network):
     
     def collect_local_stats(self, id: str, hostname: str):
         stat_data = {}
-        ip = self.get_public_ip()
-
         stat_data["prb_id"] = id
         stat_data["hstnm"] = hostname
-        stat_data["ip"] = ip
-        stat_data["url"] = self.get_url_from_ip(ip_address=ip)
 
         self.logger.info("\n📍 Local System Stats")
         stat_data["sys"] = f"{platform.system()} {platform.release()}"
