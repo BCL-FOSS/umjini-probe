@@ -32,7 +32,6 @@ def init_probe():
         return prb_id, hstnm, probe_data
     else:
         probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
-        probe_utils.get_public_ip()
         api_key = uuid.uuid4()
         probe_data['api_key'] = bcrypt.hash(str(api_key))
 

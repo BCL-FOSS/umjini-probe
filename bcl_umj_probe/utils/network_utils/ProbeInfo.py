@@ -164,7 +164,7 @@ class ProbeInfo(Network):
             'https://ifconfig.me/ip'
         ]
         for service in services:
-            pub_ip = urllib.request.urlopen(service, timeout=5).read().decode('utf8').strip()
+            pub_ip = urllib.request.urlopen(service, timeout=5)
             if not isinstance(pub_ip, str):
                 continue
             else:
