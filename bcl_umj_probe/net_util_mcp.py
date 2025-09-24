@@ -59,9 +59,12 @@ net_test = NetworkTest()
 net_utils = NetUtil(interface='')
 net_snmp = NetworkSNMP()
 
-@mcp.tool(exclude_args=['ctx', 'headers'])
-async def network_discovery(action: Annotated[str, "The type of network scan to run. The scan types are arp, tcp & udp."], iface: Annotated[str, "The network interface to run the network scan from"], subnet: Annotated[str, "The subnet/VLAN to run the network device discovery scan in"], ctx: Context = None, headers: get_http_headers = None):
+@mcp.tool(exclude_args=['ctx'])
+async def network_discovery(action: Annotated[str, "The type of network scan to run. The scan types are arp, tcp & udp."], iface: Annotated[str, "The network interface to run the network scan from"], subnet: Annotated[str, "The subnet/VLAN to run the network device discovery scan in"], ctx: Context = None):
     """Use for network device discovery within the specified subnet and network interface"""
+    request_data = ctx.get_http_request()
+
+    headers = request_data.headers
     
     verify_api(headers)
 
@@ -69,9 +72,13 @@ async def network_discovery(action: Annotated[str, "The type of network scan to 
 
     return discovered_devices
 
-@mcp.tool(exclude_args=['ctx', 'headers'])
-def speedtest(mode: Annotated[str, "Sets the probe as either the speedtest client or server. To set as server use 'sr'. To set as the client use 'cl'."], remote_host: Annotated[str, "The server to conduct the speedtest with. Required only if the probe is set as the client."], duration: Annotated[int, "Set the duration of the speedtest. Default is set as 30 seconds."], reverse: Annotated[bool, "Toggle the direction of the speedtest. Default is set to False, which performs a speedtest from client to server"], protocol: Annotated[bool, "Set the protocol of the test. Use False to run a TCP speedtest or True to run a UDP speedtest. Only required if the probe is set as the speedtest client."], ctx: Context = None, headers: get_http_headers = None):
+@mcp.tool(exclude_args=['ctx'])
+def speedtest(mode: Annotated[str, "Sets the probe as either the speedtest client or server. To set as server use 'sr'. To set as the client use 'cl'."], remote_host: Annotated[str, "The server to conduct the speedtest with. Required only if the probe is set as the client."], duration: Annotated[int, "Set the duration of the speedtest. Default is set as 30 seconds."], reverse: Annotated[bool, "Toggle the direction of the speedtest. Default is set to False, which performs a speedtest from client to server"], protocol: Annotated[bool, "Set the protocol of the test. Use False to run a TCP speedtest or True to run a UDP speedtest. Only required if the probe is set as the speedtest client."], ctx: Context = None):
     """Use to perform a network speedtest"""
+    request_data = ctx.get_http_request()
+
+    headers = request_data.headers
+
     verify_api(headers)
 
     if mode == 'cl':
@@ -82,9 +89,13 @@ def speedtest(mode: Annotated[str, "Sets the probe as either the speedtest clien
 
     return result
 
-@mcp.tool(exclude_args=['ctx', 'headers'])
-def traceroute_syn(target: Annotated[str, "The server or endpoint to trace."], port: Annotated[int, "The TCP port (or service) to test."], ctx: Context = None, headers: get_http_headers = None):
+@mcp.tool(exclude_args=['ctx'])
+def traceroute_syn(target: Annotated[str, "The server or endpoint to trace."], port: Annotated[int, "The TCP port (or service) to test."], ctx: Context = None):
     """Use to trace the route from the host probe to the TCP application (or port) on the specified target."""
+    request_data = ctx.get_http_request()
+
+    headers = request_data.headers
+
     verify_api(headers)
 
     routers = net_test.traceroute_syn(target=target, port=port)
@@ -94,9 +105,13 @@ def traceroute_syn(target: Annotated[str, "The server or endpoint to trace."], p
 
     return routers
 
-@mcp.tool(exclude_args=['ctx', 'headers'])
-def traceroute_dns(target: Annotated[str, "The server or endpoint to trace."], query: Annotated[str, "The domain to DNS query."], ctx: Context = None, headers: get_http_headers = None):
+@mcp.tool(exclude_args=['ctx'])
+def traceroute_dns(target: Annotated[str, "The server or endpoint to trace."], query: Annotated[str, "The domain to DNS query."], ctx: Context = None):
     """Use to trace the route taken by the DNS query to the specified target."""
+    request_data = ctx.get_http_request()
+
+    headers = request_data.headers
+
     verify_api(headers)
 
     routers = net_test.traceroute_dns(target=target, query=query)
@@ -106,9 +121,13 @@ def traceroute_dns(target: Annotated[str, "The server or endpoint to trace."], q
 
     return routers
 
-@mcp.tool(exclude_args=['ctx', 'headers'])
-def traceroute_udp(target: Annotated[str, "The server or endpoint to trace."], query: Annotated[str, "The domain to run the DNS query trace on."], ctx: Context = None, headers: get_http_headers = None):
+@mcp.tool(exclude_args=['ctx'])
+def traceroute_udp(target: Annotated[str, "The server or endpoint to trace."], query: Annotated[str, "The domain to run the DNS query trace on."], ctx: Context = None):
     """Use to trace the route from the host probe to the UDP application specified in the target. """
+    request_data = ctx.get_http_request()
+
+    headers = request_data.headers
+    
     verify_api(headers)
     
     routers = net_test.traceroute_udp(target=target, query=query)
