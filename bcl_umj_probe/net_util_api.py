@@ -27,9 +27,6 @@ class ToolCall(BaseModel):
     action: str 
     params: dict 
 
-prb_id = None
-hstnm = None
-probe_data = None
 probe_utils = ProbeInfo()
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
@@ -46,15 +43,11 @@ logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global prb_id, hstnm, probe_data
-    prb_id, hstnm, probe_data = init_probe()
-    logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
-    yield
+prb_id, hstnm, probe_data = init_probe()
+logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
 
 mcp_app = mcp.http_app(path="/mcp")
-api = FastAPI(title='Network Util API', lifespan=lifespan)
+api = FastAPI(title='Network Util API', lifespan=mcp_app.lifespan)
 
 async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: dict = {}, cookies: str = ''):
     async with httpx.AsyncClient() as client:
