@@ -91,6 +91,7 @@ async def init(init_data: Init):
     
     probe_data['url'] = init_data.probe_url
     probe_data['prb_api_key'] = init_data.probe_api_key
+    probe_data['site'] = init_data.site
     logger.info(probe_data)
 
     if await enrollment(payload=probe_data) != 200:
