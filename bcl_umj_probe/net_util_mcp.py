@@ -62,6 +62,7 @@ net_snmp = NetworkSNMP()
 @mcp.tool(exclude_args=['ctx', 'headers'])
 async def network_discovery(action: Annotated[str, "The type of network scan to run. The scan types are arp, tcp & udp."], iface: Annotated[str, "The network interface to run the network scan from"], subnet: Annotated[str, "The subnet/VLAN to run the network device discovery scan in"], ctx: Context = None, headers: get_http_headers = None):
     """Use for network device discovery within the specified subnet and network interface"""
+
     verify_api(headers)
 
     discovered_devices = await net_utils.full_discovery(action=action, interface=iface, subnet=subnet)
@@ -84,7 +85,9 @@ def speedtest(mode: Annotated[str, "Sets the probe as either the speedtest clien
 @mcp.tool(exclude_args=['ctx', 'headers'])
 def traceroute_syn(target: Annotated[str, "The server or endpoint to trace."], port: Annotated[int, "The TCP port (or service) to test."], ctx: Context = None, headers: get_http_headers = None):
     """Use to trace the route from the host probe to the TCP application (or port) on the specified target."""
-    verify_api(headers)
+    header_data = get_http_headers()
+    
+    verify_api(header_data)
 
     routers = net_test.traceroute_syn(target=target, port=port)
 
