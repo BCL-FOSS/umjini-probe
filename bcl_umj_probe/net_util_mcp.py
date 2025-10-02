@@ -82,7 +82,7 @@ def speedtest(mode: Annotated[str, "Sets the probe as either the speedtest clien
 
     return result
 
-@mcp.tool(exclude_args=['ctx', 'headers'])
+@mcp.tool
 def traceroute_syn(target: Annotated[str, "The server or endpoint to trace."], port: Annotated[int, "The TCP port (or service) to test."]):
     """Use to trace the route from the host probe to the TCP application (or port) on the specified target."""
     header_data = get_http_headers()
