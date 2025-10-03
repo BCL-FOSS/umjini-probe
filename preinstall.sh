@@ -9,7 +9,9 @@ open_firewall_port() {
             # UFW setup
             if command -v ufw > /dev/null 2>&1; then
                 sudo ufw allow 8000/tcp
-                echo "Port 8000 opened in UFW."
+                sudo ufw allow 7969/tcp
+                sudo ufw allow 7968/tcp
+                echo "Ports 8000, 7969, 7968 opened in UFW."
             else
                 echo "UFW not installed. Skipping UFW rule."
             fi
@@ -17,7 +19,9 @@ open_firewall_port() {
             # iptables setup
             if command -v iptables > /dev/null 2>&1; then
                 sudo iptables -A INPUT -p tcp --dport 8000 -j ACCEPT
-                echo "Port 8000 opened in iptables."
+                sudo iptables -A INPUT -p tcp --dport 7969 -j ACCEPT
+                sudo iptables -A INPUT -p tcp --dport 7968 -j ACCEPT
+                echo "Ports 8000, 7969, 7968 opened in iptables."
 
                 # Persist iptables rules if iptables-persistent is available
                 if command -v iptables-save > /dev/null 2>&1 && [ -d /etc/iptables ]; then
@@ -60,7 +64,7 @@ install_dependencies() {
             fi
 
             PACKAGE_MANAGER="apt"
-            PACKAGE_LIST="tshark tcpdump gpsd gpsd-clients iputils-ping iperf3 aircrack-ng libpcap-dev p0f traceroute graphviz"
+            PACKAGE_LIST="tshark tcpdump gpsd gpsd-clients iputils-ping iperf3 aircrack-ng libpcap-dev p0f traceroute graphviz sshpass dnsdiag nmap"
             ;;
         *)
             echo "Unknown or unsupported distribution. Exiting."

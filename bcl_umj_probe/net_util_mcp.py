@@ -59,66 +59,88 @@ net_test = NetworkTest()
 net_utils = NetUtil(interface='')
 net_snmp = NetworkSNMP()
 
-@mcp.tool(exclude_args=['ctx', 'headers'])
-async def network_discovery(action: Annotated[str, "The type of network scan to run. The scan types are arp, tcp & udp."], iface: Annotated[str, "The network interface to run the network scan from"], subnet: Annotated[str, "The subnet/VLAN to run the network device discovery scan in"], ctx: Context = None, headers: get_http_headers = None):
-    """Use for network device discovery within the specified subnet and network interface"""
-
-    verify_api(headers)
-
-    discovered_devices = await net_utils.full_discovery(action=action, interface=iface, subnet=subnet)
-
-    return discovered_devices
-
-@mcp.tool(exclude_args=['ctx', 'headers'])
-def speedtest(mode: Annotated[str, "Sets the probe as either the speedtest client or server. To set as server use 'sr'. To set as the client use 'cl'."], remote_host: Annotated[str, "The server to conduct the speedtest with. Required only if the probe is set as the client."], duration: Annotated[int, "Set the duration of the speedtest. Default is set as 30 seconds."], reverse: Annotated[bool, "Toggle the direction of the speedtest. Default is set to False, which performs a speedtest from client to server"], protocol: Annotated[bool, "Set the protocol of the test. Use False to run a TCP speedtest or True to run a UDP speedtest. Only required if the probe is set as the speedtest client."], ctx: Context = None, headers: get_http_headers = None):
-    """Use to perform a network speedtest"""
-    verify_api(headers)
-
-    if mode == 'cl':
-        result = net_test.start_iperf(mode=mode, remote_host=remote_host, duration=duration, reverse=reverse, udp=protocol)
-    
-    if mode == 'sr':
-        result = net_test.start_iperf(mode=mode)
-
-    return result
-
 @mcp.tool
-def traceroute_syn(target: Annotated[str, "The server or endpoint to trace."], port: Annotated[int, "The TCP port (or service) to test."]):
-    """Use to trace the route from the host probe to the TCP application (or port) on the specified target."""
+async def speedtest_server(options: Annotated[str, "Additional command line flags to add to the iperf3 command."] = None, host: Annotated[str, "The IP address of the incoming interface the iperf server binds to. Defaults to 0.0.0.0 to bind to all available interfaces. This should be set for multihomed umjiniti probes."] = None):
+    """Runs speedtest server which performs active measurements of the maximum achievable bandwidth on the specified IP network (host). Supports tuning of various parameters related to timing, buffers and protocols (TCP, UDP, SCTP with IPv4 and IPv6) via the command line flag options provided by the user. For each test it reports the bandwidth, loss, and other parameters."""
+
     header_data = get_http_headers()
-    
     verify_api(header_data)
 
-    routers = net_test.traceroute_syn(target=target, port=port)
-
-    for pkt in routers:
-        logger.info(pkt)
-
-    return routers
-
-@mcp.tool(exclude_args=['ctx', 'headers'])
-def traceroute_dns(target: Annotated[str, "The server or endpoint to trace."], query: Annotated[str, "The domain to DNS query."], ctx: Context = None, headers: get_http_headers = None):
-    """Use to trace the route taken by the DNS query to the specified target."""
-    verify_api(headers)
-
-    routers = net_test.traceroute_dns(target=target, query=query)
-
-    for pkt in routers:
-        logger.info(pkt)
-
-    return routers
-
-@mcp.tool(exclude_args=['ctx', 'headers'])
-def traceroute_udp(target: Annotated[str, "The server or endpoint to trace."], query: Annotated[str, "The domain to run the DNS query trace on."], ctx: Context = None, headers: get_http_headers = None):
-    """Use to trace the route from the host probe to the UDP application specified in the target. """
-    verify_api(headers)
+    if options and host is not None or ''.strip():
+        code, output, error = await net_test.iperf_server(options=options, host=host)
+        return code, output, error
     
-    routers = net_test.traceroute_udp(target=target, query=query)
-
-    for pkt in routers:
-        logger.info(pkt)
-
-    return routers
+    if options is not None or ''.strip():
+        code, output, error = await net_test.iperf_server(options=options)
+        return code, output, error
     
+    if host is not None or ''.strip():
+        code, output, error = await net_test.iperf_server(host=host)
+        return code, output, error
+    
+    code, output, error = await net_test.iperf_server()
+    return code, output, error
+
+@mcp.tool
+async def speedtest_client(server: Annotated[str, "The speedtest server the client connects to."], options: Annotated[str, "Additional command line flags to add to the iperf3 command."] = None, host: Annotated[str, "The IP address of the incoming interface the iperf client binds to. Defaults to 0.0.0.0 to bind to all available interfaces. This should be set for multihomed umjiniti probes."] = None):
+    """Starts the client-side of the speedtest to assist with active measurements of the maximum achievable bandwidth from client to the specified server."""
+
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    if options and host is not None or ''.strip():
+        code, output, error = await net_test.iperf_client(server=server, options=options, host=host)
+        return code, output, error
+    
+    if options is not None or ''.strip():
+        code, output, error = await net_test.iperf_client(server=server, options=options)
+        return code, output, error
+    
+    if host is not None or ''.strip():
+        code, output, error = await net_test.iperf_client(server=server, host=host)
+        return code, output, error
+    
+    code, output, error = await net_test.iperf_server()
+    return code, output, error
+
+@mcp.tool
+async def traceroute(target: Annotated[str, "The server or endpoint to trace."], options: Annotated[str, "Additional command line flags to add to the traceroute command"] = None, packetlength: Annotated[str, "Sets the total size of the probing packet"] = None):
+    """traceroute  tracks  the  route packets taken from an IP network on their way to a given host. It utilizes
+       the IP protocol's time to live (TTL) field and attempts to elicit an  ICMP  TIME_EXCEEDED  response  from
+       each gateway along the path to the host."""
+
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    if options and packetlength is not None or ''.strip():
+       code, output, error = await net_test.traceroute(target=target, options=options, packetlen=packetlength)
+       return code, output, error
+
+    if options is not None or ''.strip():
+       code, output, error = await net_test.traceroute(target=target, options=options)
+       return code, output, error
+
+    if packetlength is not None or ''.strip():
+        code, output, error = await net_test.traceroute(target=target, packetlen=packetlength)
+        return code, output, error
+
+    code, output, error = await net_test.traceroute(target=target)
+    return code, output, error
+
+@mcp.tool
+async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace."], options: Annotated[str, "Additional command line flags to add to the dnstraceroute command"] = None):
+    """dnstraceroute is a traceroute utility to figure out the path that a DNS request is passing through to get
+       to  its destination.  Comparing it to a network traceroute can help identify if DNS traffic is routed via
+       any unwanted path."""
+
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    if options is not None or ''.strip():
+       code, output, error = await net_test.traceroute(target=target, options=options)
+       return code, output, error
+
+    code, output, error = await net_test.dnstraceroute(target=target)
+    return code, output, error
 
 
