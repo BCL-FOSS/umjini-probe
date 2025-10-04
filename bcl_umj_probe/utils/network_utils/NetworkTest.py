@@ -61,8 +61,8 @@ class NetworkTest(Network):
 
         return code, output, error
     
-    async def dnstraceroute(self, target: str, options: str = None):
-        command = f'dnstraceroute '
+    async def dnstraceroute(self, target: str, server: str = '8.8.8.8', options: str = None):
+        command = f'dnstraceroute -s {server} '
 
         if options is not None:
             command += options

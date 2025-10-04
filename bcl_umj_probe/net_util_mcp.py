@@ -128,7 +128,7 @@ async def traceroute(target: Annotated[str, "The server or endpoint to trace."],
     return code, output, error
 
 @mcp.tool
-async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace."], options: Annotated[str, "Additional command line flags to add to the dnstraceroute command"] = None):
+async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace."], options: Annotated[str, "Additional command line flags to add to the dnstraceroute command"] = None, server: Annotated[str, "The DNS server to use for the traceroute. Defaults to 8.8.8.8 (google DNS server)"] = None):
     """dnstraceroute is a traceroute utility to figure out the path that a DNS request is passing through to get
        to  its destination.  Comparing it to a network traceroute can help identify if DNS traffic is routed via
        any unwanted path."""
@@ -136,8 +136,16 @@ async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace
     header_data = get_http_headers()
     verify_api(header_data)
 
+    if options and server is not None or ''.strip():
+       code, output, error = await net_test.dnstraceroute(target=target, options=options, server=server)
+       return code, output, error
+
     if options is not None or ''.strip():
-       code, output, error = await net_test.traceroute(target=target, options=options)
+       code, output, error = await net_test.dnstraceroute(target=target, options=options)
+       return code, output, error
+    
+    if server is not None or ''.strip():
+       code, output, error = await net_test.dnstraceroute(target=target, server=server)
        return code, output, error
 
     code, output, error = await net_test.dnstraceroute(target=target)
