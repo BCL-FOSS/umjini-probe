@@ -60,13 +60,6 @@ net_utils = NetUtil(interface='')
 net_snmp = NetworkSNMP()
 
 @mcp.tool
-async def network_discovery():
-    
-    header_data = get_http_headers()
-    verify_api(header_data)
-
-
-@mcp.tool
 async def speedtest_server(options: Annotated[str, "Additional command line flags to add to the iperf3 command."] = None, host: Annotated[str, "The IP address of the incoming interface the iperf server binds to. Defaults to 0.0.0.0 to bind to all available interfaces. This should be set for multihomed umjiniti probes."] = None):
     """Runs speedtest server which performs active measurements of the maximum achievable bandwidth on the specified IP network (host). Supports tuning of various parameters related to timing, buffers and protocols (TCP, UDP, SCTP with IPv4 and IPv6) via the command line flag options provided by the user. For each test it reports the bandwidth, loss, and other parameters."""
 
