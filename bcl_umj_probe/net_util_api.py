@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends
+from fastapi_user_limiter.limiter import rate_limiter
 from pydantic import BaseModel
 from init_app import (
     validate_api_key,
@@ -57,7 +58,7 @@ async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: di
         elif cmd == 'g':
             return await client.get(url, headers=headers)
 
-@api.get("/api/status", dependencies=[Depends(validate_api_key)])
+@api.get("/api/status", dependencies=[Depends(rate_limiter(2, 5))])
 def status():
     return {"status": "ok"}
 

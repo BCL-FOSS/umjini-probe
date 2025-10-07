@@ -65,7 +65,7 @@ class NetworkTest(Network):
         command = f'dnstraceroute -s {server} '
 
         if options is not None:
-            command += options
+            command += f'{options} '
             command += target
             self.logger.info(command)
         else:

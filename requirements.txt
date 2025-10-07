@@ -22,3 +22,4 @@ geoip2
 vpython
 beautifulsoup4
 dnspython
+fastapi-user-limiter
