@@ -26,21 +26,21 @@ UVICORN_LOG_LEVEL = "info"
 def require_tool(name: str) -> bool:
     if shutil.which(name):
         return True
-    print(f"[!] Required tool not found on PATH: {name!r}")
+    logger.info(f"[!] Required tool not found on PATH: {name!r}")
     return False
 
 def run_cmd(cmd: List[str], cwd: Optional[Path] = None, env: Optional[dict] = None) -> int:
     try:
-        print(f"\n$ {' '.join(cmd)}\n")
+        logger.info(f"\n$ {' '.join(cmd)}\n")
         result = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=env)
         return result.returncode
     except KeyboardInterrupt:
-        print("\n[!] Interrupted by user (Ctrl-C). Returning to menu...\n")
+        logger.info("\n[!] Interrupted by user (Ctrl-C). Returning to menu...\n")
         return 130
 
 def run_bash_script(script: Path, args: List[str]) -> int:
     if not script.exists():
-        print(f"[!] Script not found: {script}")
+        logger.info(f"[!] Script not found: {script}")
         return 127
     if not require_tool("bash"):
         return 127
@@ -83,13 +83,13 @@ def ask_choice(prompt: str, valid: List[str]) -> str:
         choice = input(prompt).strip()
         if choice in valid:
             return choice
-        print(f"Please choose one of: {', '.join(valid)}")
+        logger.info(f"Please choose one of: {', '.join(valid)}")
 
 def pause():
     input("\nPress Enter to return to the menu...")
 
 def main() -> int:
-    print(f"Project root: {PROJECT_ROOT}")
+    logger.info(f"Project root: {PROJECT_ROOT}")
 
     while True:
         logger.info(
@@ -103,26 +103,14 @@ def main() -> int:
         match choice:
             case '1':
                 logger.info("Running dependency + build scripts...")
-                logger.info("""
-                Installs the following dependencies on linux/unix systems:
-                - tshark 
-                - tcpdump 
-                - gpsd 
-                - gpsd-clients 
-                - iputils-ping 
-                - iperf3 
-                - aircrack-ng 
-                - libpcap-dev 
-                - p0f 
-                - traceroute
-                    """)
+    
                 code = run_bash_script(DEPENDENCIES_SCRIPT, [])
                 logger.info(f"[i] Dependency script exited with code {code}")
                 code = run_bash_script(BUILD_SCRIPT, [])
                 logger.info(f"[i] Build script exited with code {code}")
                 pause()
             case '2':
-                print("\nStarting FastAPI app in venv. Press Ctrl-C to stop...\n")
+                logger.info("\nStarting FastAPI app in venv. Press Ctrl-C to stop...\n")
                 code = run_uvicorn_in_venv()
                 logger.info(f"[i] Uvicorn exited with code {code}")
             case 'q':
@@ -133,5 +121,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except KeyboardInterrupt:
-        print("\nInterrupted. Exiting.")
+        logger.info("\nInterrupted. Exiting.")
         raise SystemExit(130)

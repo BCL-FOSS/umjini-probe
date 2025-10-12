@@ -1,22 +1,24 @@
 from fastmcp import FastMCP
 from typing import Annotated
-from utils.network_utils.NetworkDiscovery import NetworkDiscovery
 from utils.network_utils.NetworkTest import NetworkTest
-from utils.NetUtil import NetUtil
 from utils.network_utils.NetworkSNMP import NetworkSNMP
 from utils.network_utils.ProbeInfo import ProbeInfo
 import logging
 import redis
 from fastapi import HTTPException, status
 from passlib.hash import bcrypt
-from fastmcp import FastMCP, Context
+from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
+from utils.LogAlert import LogAlert
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 probe_utils = ProbeInfo()
+net_test = NetworkTest()
+net_snmp = NetworkSNMP()
+log_alert = LogAlert()
 
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 pong = r.ping()
@@ -54,10 +56,6 @@ def verify_api(headers: dict[str, str]) -> None:
                 )
 
 mcp = FastMCP(name="Network Util MCP")
-net_discovery = NetworkDiscovery()
-net_test = NetworkTest()
-net_utils = NetUtil(interface='')
-net_snmp = NetworkSNMP()
 
 @mcp.tool
 async def speedtest_server(options: Annotated[str, "Additional command line flags to add to the iperf3 command."] = None, host: Annotated[str, "The IP address of the incoming interface the iperf server binds to. Defaults to 0.0.0.0 to bind to all available interfaces. This should be set for multihomed umjiniti probes."] = None):
@@ -79,6 +77,14 @@ async def speedtest_server(options: Annotated[str, "Additional command line flag
         return code, output, error
     
     code, output, error = await net_test.iperf_server()
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"speedtest_srvr_result", message=log_message)
+
     return code, output, error
 
 @mcp.tool
@@ -101,6 +107,14 @@ async def speedtest_client(server: Annotated[str, "The speedtest server the clie
         return code, output, error
     
     code, output, error = await net_test.iperf_server()
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"speedtest_client_result", message=log_message)
+
     return code, output, error
 
 @mcp.tool
@@ -125,6 +139,14 @@ async def traceroute(target: Annotated[str, "The server or endpoint to trace."],
         return code, output, error
 
     code, output, error = await net_test.traceroute(target=target)
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"traceroute_result", message=log_message)
+
     return code, output, error
 
 @mcp.tool
@@ -149,6 +171,14 @@ async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace
        return code, output, error
 
     code, output, error = await net_test.dnstraceroute(target=target)
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"dnstraceroute_result", message=log_message)
+
     return code, output, error
 
 

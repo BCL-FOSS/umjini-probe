@@ -1,8 +1,19 @@
 #!/bin/sh
 
+setup_log_dir() {
+    DISTRO=$1
+    echo "Configuring log directory..."
+
+    case "$DISTRO" in
+        debian|ubuntu)
+            sudo mkdir -p /var/log/umj
+            sudo chown $USER:$USER /var/log/umj
+            sudo chmod 755 /var/log/umj
+}
+
 open_firewall_port() {
     DISTRO=$1
-    echo "Opening port 8000 on $DISTRO..."
+    echo "Opening ports 8000, 7969 and 7968 on $DISTRO..."
 
     case "$DISTRO" in
         debian|ubuntu)
@@ -64,7 +75,7 @@ install_dependencies() {
             fi
 
             PACKAGE_MANAGER="apt"
-            PACKAGE_LIST="tshark tcpdump gpsd gpsd-clients iputils-ping iperf3 aircrack-ng libpcap-dev p0f traceroute graphviz sshpass dnsdiag nmap"
+            PACKAGE_LIST="tshark tcpdump iputils-ping iperf3 aircrack-ng libpcap-dev p0f traceroute sshpass dnsdiag nmap"
             ;;
         *)
             echo "Unknown or unsupported distribution. Exiting."
@@ -134,3 +145,4 @@ get_distro() {
 DISTRIBUTION=$(get_distro)
 install_dependencies "$DISTRIBUTION"
 open_firewall_port "$DISTRIBUTION"
+setup_log_dir "$DISTRIBUTION"

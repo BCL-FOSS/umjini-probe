@@ -1,20 +1,7 @@
 # umjiniti-probe
-Open source network monitoring and analysis MCP server and API
+Open source tool to turn your favorite LLM into a bonafide network administrator.
 
 ```bash
-# Update system and install Ruby and build tools
-$ sudo apt-get install -y \
-    ruby-full \
-    rpm \
-    squashfs-tools \
-    build-essential 
-
-# Install FPM (from official docs)
-$ gem install fpm
-
-$ apt install python3.12-venv
-
-$ sudo chmod +x build_package.sh
-
-$ sudo ./build_package.sh  "Usage: $0 [--deb | --rpm | --pkg | --txz]"
+# run cli.py to start
+$ sudo python3 cli.py
 ```

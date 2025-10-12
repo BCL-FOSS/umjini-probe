@@ -1,35 +1,15 @@
 import socket
-import json
 import psutil
-import json
-import requests
-from scapy.all import *
-from scapy import *
-from scapy.tools import *
-from scapy.layers.inet import *
-from scapy.layers.l2 import *
 import urllib.request
-import pyshark
 import subprocess
 import platform
 import re
 import shutil
-import logging
 import urllib.request
-import socket
 import fcntl
 import struct
 from utils.network_utils.base.Network import Network
 import uuid
-import socket
-import subprocess
-import platform
-import logging
-import logging
-import platform
-import subprocess
-import socket
-import psutil
 import dns.resolver
 import dns.reversename
 

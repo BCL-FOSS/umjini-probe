@@ -1,18 +1,4 @@
-import os
-import platform
-import subprocess
-import requests
-import iperf3
-from iperf3 import TestResult
 from utils.network_utils.base.Network import Network
-from scapy.all import *
-from scapy import *
-from scapy.tools import *
-from scapy.layers.inet import *
-from scapy.layers.l2 import *
-from scapy.layers import dns
-from scapy.layers.dns import *
-import asyncio
 from datetime import datetime, timezone
 
 class NetworkTest(Network):

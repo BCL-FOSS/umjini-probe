@@ -6,11 +6,8 @@ from init_app import (
     init_probe
 )
 import httpx
-from contextlib import asynccontextmanager
 from utils.network_utils.ProbeInfo import ProbeInfo
-from utils.network_utils.NetworkDiscovery import NetworkDiscovery
 from utils.network_utils.NetworkTest import NetworkTest
-from utils.NetUtil import NetUtil
 from typing import Callable
 import logging
 from net_util_mcp import mcp
@@ -29,9 +26,7 @@ class ToolCall(BaseModel):
     params: dict 
 
 probe_utils = ProbeInfo()
-net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
-net_utils = NetUtil(interface='')
 
 prb_action_map: dict[str, Callable[[dict], object]] = {
     "prbdta": probe_utils.get_probe_data,

@@ -42,7 +42,7 @@ install_py_dependencies() {
     echo "Install python-venv if not installed already"
     sudo $PACKAGE_MANAGER install -y python3.12-venv
 
-    echo "⚙️ Creating Python venv inside build staging..."
+    echo "Creating Python venv inside build staging..."
     sudo python3 -m venv "$BUILD_DIR/venv"
     sudo "$BUILD_DIR/venv/bin/pip" install --upgrade pip
     sudo "$BUILD_DIR/venv/bin/pip" install -r requirements.txt
@@ -54,4 +54,4 @@ install_py_dependencies() {
 DISTRIBUTION=$(get_distro)
 install_py_dependencies "$DISTRIBUTION"
 
-echo "✅ Package built successfully."
+echo "umjiniti-probe built successfully."

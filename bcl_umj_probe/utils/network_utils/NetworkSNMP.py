@@ -1,14 +1,10 @@
 import asyncio
-import time
-import aiohttp  # for HTTP calls to retrieve MIB data
 import asyncio
 from pysnmp.hlapi.v3arch.asyncio import *
 from pysnmp.smi.rfc1902 import ObjectIdentity, ObjectType
 from utils.network_utils.base.Network import Network
 import asyncio
-import aiohttp
 from bs4 import BeautifulSoup
-import json
 import httpx
 from collections import deque
 from pysnmp.entity import engine, config
