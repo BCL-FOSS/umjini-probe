@@ -14,3 +14,4 @@ passlib
 beautifulsoup4
 dnspython
 fastapi-user-limiter
+python-dotenv

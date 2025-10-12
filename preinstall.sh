@@ -1,5 +1,15 @@
 #!/bin/sh
 
+setup_probe_dir() {
+    DISTRO=$1
+    echo "Configuring log directory..."
+
+    case "$DISTRO" in
+        debian|ubuntu)
+            sudo chown $USER:$USER .
+            sudo chmod 700 .
+}
+
 setup_log_dir() {
     DISTRO=$1
     echo "Configuring log directory..."
@@ -8,7 +18,7 @@ setup_log_dir() {
         debian|ubuntu)
             sudo mkdir -p /var/log/umj
             sudo chown $USER:$USER /var/log/umj
-            sudo chmod 755 /var/log/umj
+            sudo chmod 744 /var/log/umj
 }
 
 open_firewall_port() {
@@ -146,3 +156,4 @@ DISTRIBUTION=$(get_distro)
 install_dependencies "$DISTRIBUTION"
 open_firewall_port "$DISTRIBUTION"
 setup_log_dir "$DISTRIBUTION"
+setup_probe_dir "$DISTRIBUTION"

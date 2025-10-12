@@ -11,20 +11,14 @@ from utils.network_utils.NetworkTest import NetworkTest
 from typing import Callable
 import logging
 from net_util_mcp import mcp
-
-class Init(BaseModel):
-    api_key: str
-    usr: str
-    url: str
-    site: str
-    probe_url: str
-    probe_api_key: str
-    enroll: bool
+import os
+from dotenv import load_dotenv
 
 class ToolCall(BaseModel):
     action: str 
     params: dict 
 
+load_dotenv() 
 probe_utils = ProbeInfo()
 net_test = NetworkTest()
 
@@ -57,16 +51,15 @@ async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: di
 def status():
     return {"status": "ok"}
 
-@api.post("/api/init", dependencies=[Depends(validate_api_key)])
-async def init(init_data: Init):
+@api.get("/api/init", dependencies=[Depends(validate_api_key)])
+async def init():
     async def enrollment(payload: dict = {}):
-        logger.info(init_data)
-        headers = {"X-UMJ-WFLW-API-KEY": init_data.api_key}
-        post_headers = {"X-UMJ-WFLW-API-KEY": init_data.api_key,
+        headers = {"X-UMJ-WFLW-API-KEY": os.environ.get('X-UMJ-WFLW-API-KEY')}
+        post_headers = {"X-UMJ-WFLW-API-KEY": os.environ.get('X-UMJ-WFLW-API-KEY'),
                         "Content-Type": "application/json"}
 
-        init_url = f"https://{init_data.url}/init?usr={init_data.usr}"
-        enroll_url = f"https://{init_data.url}/enroll?usr={init_data.usr}&site={init_data.site}"
+        init_url = f"https://{os.environ.get('UMJ-URL')}/init?usr={os.environ.get('UMJ-USR')}"
+        enroll_url = f"https://{os.environ.get('UMJ-URL')}/enroll?usr={os.environ.get('UMJ-USR')}&site={os.environ.get('UMJ-SITE')}"
 
         resp_data = await _make_http_request(cmd="g", url=init_url, headers=headers)
         if resp_data.status_code == 200:
@@ -81,13 +74,10 @@ async def init(init_data: Init):
                 payload=payload,
             )
             return 200 if enroll_rqst.status_code == 200 else 400
-
-    if init_data.enroll is False or not (init_data.api_key and init_data.usr and init_data.url and init_data.site):
-        return 400
     
-    probe_data['url'] = init_data.probe_url
-    probe_data['prb_api_key'] = init_data.probe_api_key
-    probe_data['site'] = init_data.site
+    probe_data['url'] = os.environ.get('UMJ-URL')
+    probe_data['prb_api_key'] = os.environ.get('PRB-API-KEY')
+    probe_data['site'] = os.environ.get('UMJ-SITE')
     logger.info(probe_data)
 
     if await enrollment(payload=probe_data) != 200:
