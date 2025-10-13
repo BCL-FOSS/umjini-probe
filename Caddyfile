@@ -18,6 +18,10 @@ probe-a.baughcl.tech {
 		reverse_proxy umjprobe:8000
 	}
 
+	handle /openapi.json* {
+        reverse_proxy umjprobe:8000
+    }
+
 	handle /llm/mcp* {
 		reverse_proxy umjprobe:8000
 	}
