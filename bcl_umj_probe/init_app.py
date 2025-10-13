@@ -22,7 +22,7 @@ logger.info(f"Redis ping: {pong}")
 
 def init_probe():
     prb_id, hstnm = probe_utils.gen_probe_register_data()
-    cursor, keys = r.scan(cursor=0, match=f'*{hstnm}*')
+    cursor, keys = r.scan(cursor=0, match=f'prb-*')
 
     if keys:
         for redis_key in keys:
