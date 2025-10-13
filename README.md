@@ -1,7 +1,7 @@
 # umjiniti-probe
 Open source tool to turn your favorite LLM into a bonafide network administrator.
 
-# Initial Configuration
+### Initial Configuration
 ```bash
 # Assign A record for probe
 
