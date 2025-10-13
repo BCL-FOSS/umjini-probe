@@ -21,7 +21,7 @@ services:
     container_name: probedb
     command: ["redis-server", "--port", "6369", "--appendonly", "yes"]
     volumes:
-      - probe_db_data/data 
+      - probe_db_data:/data 
 
   caddy:
     image: caddy:latest
