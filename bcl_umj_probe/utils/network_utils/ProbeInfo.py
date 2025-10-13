@@ -1,11 +1,9 @@
 import socket
 import psutil
-import urllib.request
 import subprocess
 import platform
 import re
 import shutil
-import urllib.request
 import fcntl
 import struct
 from utils.network_utils.base.Network import Network
@@ -126,25 +124,6 @@ class ProbeInfo(Network):
         if port in (80, 443):
             return f"{scheme}://{host}"
         return f"{scheme}://{host}:{port}"
-    
-    def get_public_ip(self) -> str:
-        """
-        Retrieves public IP of probe host.
-
-        Returns:
-            pub_ip (str): Public IP Address
-        """
-        services = [
-            'https://ident.me',
-            'https://api.ipify.org',
-            'https://ifconfig.me/ip'
-        ]
-        for service in services:
-            pub_ip = urllib.request.urlopen(service, timeout=5)
-            if not isinstance(pub_ip, str):
-                continue
-            else:
-                return pub_ip
 
     def get_interface_ip(self, interface: str) -> str:
         """
