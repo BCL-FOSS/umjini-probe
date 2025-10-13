@@ -1,14 +1,25 @@
 #!/bin/sh
 set -e
 
+setup_probe_dir() {
+    DISTRO=$1
+    echo "Configuring probe directory..."
+
+    case "$DISTRO" in
+        debian|ubuntu)
+            sudo chown $USER:$USER .env
+            sudo chmod 700 .env
+}
+
 setup_log_dir() {
     DISTRO=$1
     echo "Configuring log directory..."
 
     case "$DISTRO" in
         debian|ubuntu)
-            sudo chown $USER:$USER .env
-            sudo chmod 700 .env
+            sudo mkdir -p /var/log/umj
+            sudo chown $USER:$USER /var/log/umj
+            sudo chmod 744 /var/log/umj
 }
 
 get_distro() {

@@ -1,16 +1,5 @@
 #!/bin/sh
 
-setup_log_dir() {
-    DISTRO=$1
-    echo "Configuring log directory..."
-
-    case "$DISTRO" in
-        debian|ubuntu)
-            sudo mkdir -p /var/log/umj
-            sudo chown $USER:$USER /var/log/umj
-            sudo chmod 744 /var/log/umj
-}
-
 open_firewall_port() {
     DISTRO=$1
     echo "Opening ports 8000, 7969 and 7968 on $DISTRO..."
