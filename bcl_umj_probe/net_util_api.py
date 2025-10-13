@@ -12,13 +12,11 @@ from typing import Callable
 import logging
 from net_util_mcp import mcp
 import os
-from dotenv import load_dotenv
 
 class ToolCall(BaseModel):
     action: str 
     params: dict 
 
-load_dotenv() 
 probe_utils = ProbeInfo()
 net_test = NetworkTest()
 

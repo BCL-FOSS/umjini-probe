@@ -1,0 +1,51 @@
+services:
+  umj_probe:
+    restart: always
+    build:
+      context: .
+      dockerfile: bcl_umj_probe/Dockerfile
+    container_name: umjprobe
+    environment:
+      - PROBE_DB=probedb
+      - PROBE_DB_PORT=6369
+      - PROBE_DB_PASS=${DB_PASS}
+    depends_on:
+      - umj_probe_redis
+    volumes:
+      - probe_app_data:/home/quart/probedata
+    ports:
+      - "7969:7969/tcp"
+      - "7968:7968/tcp"
+
+  umj_probe_redis:
+    image: redis:latest
+    container_name: probedb
+    command: ["redis-server", "--port", "6369", "--appendonly", "yes", "--requirepass", "${DB_PASS}"]
+    environment:
+      - DB_PASS=${DB_PASS}
+    volumes:
+      - probe_db_data/data 
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - umj_probe
+
+volumes:
+  probe_app_data:
+    external: true
+  probe_db_data:
+    external: true
+  caddy_data:
+    external: true
+  caddy_config:
+    external: true
