@@ -8,7 +8,7 @@ Open source tool to turn your favorite LLM into a bonafide network administrator
 # Change url in Caddyfile to url assigned to A record
 
 # Set database password environment variable
-$ export DB_PASS=""
+$ export DB_PASS=''
 
 # Set app scripts as executable
 $ sudo chmod +x init.sh
