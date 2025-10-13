@@ -8,7 +8,6 @@ services:
     environment:
       - PROBE_DB=probedb
       - PROBE_DB_PORT=6369
-      - PROBE_DB_PASS=${DB_PASS}
     depends_on:
       - umj_probe_redis
     volumes:
@@ -20,9 +19,7 @@ services:
   umj_probe_redis:
     image: redis:latest
     container_name: probedb
-    command: ["redis-server", "--port", "6369", "--appendonly", "yes", "--requirepass", "${DB_PASS}"]
-    environment:
-      - DB_PASS=${DB_PASS}
+    command: ["redis-server", "--port", "6369", "--appendonly", "yes"]
     volumes:
       - probe_db_data/data 
 

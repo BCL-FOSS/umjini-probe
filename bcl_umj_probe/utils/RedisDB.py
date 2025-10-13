@@ -13,7 +13,7 @@ class RedisDB:
     async def connect_db(self):
         self.redis_conn = redis.from_url( 
                 f"redis://{self.host_name}:{self.port}", 
-                encoding="utf-8", decode_responses=True, username="default", password=os.environ.get('PROBE_DB_PASS'))
+                encoding="utf-8", decode_responses=True)
         if self.redis_conn is None:
             self.logger.info(f'Redis connection to {self.host_name} failed')
             return None
