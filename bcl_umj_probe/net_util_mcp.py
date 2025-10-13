@@ -10,6 +10,7 @@ from passlib.hash import bcrypt
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
 from utils.LogAlert import LogAlert
+import os
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
@@ -20,7 +21,7 @@ net_test = NetworkTest()
 net_snmp = NetworkSNMP()
 log_alert = LogAlert()
 
-r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+r = redis.Redis(host=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'), decode_responses=True)
 pong = r.ping()
 logger.info(f"Redis ping: {pong}")
 
