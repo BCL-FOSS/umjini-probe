@@ -40,7 +40,7 @@ install_py_dependencies() {
     esac
 
     echo "Install python-venv if not installed already"
-    sudo $PACKAGE_MANAGER install -y python3.12-venv
+    sudo $PACKAGE_MANAGER install -y python3-venv
 
     echo "Creating Python venv inside build staging..."
     sudo python3 -m venv "$BUILD_DIR/venv"

@@ -1,15 +1,5 @@
 #!/bin/sh
 
-setup_probe_dir() {
-    DISTRO=$1
-    echo "Configuring log directory..."
-
-    case "$DISTRO" in
-        debian|ubuntu)
-            sudo chown $USER:$USER .
-            sudo chmod 700 .
-}
-
 setup_log_dir() {
     DISTRO=$1
     echo "Configuring log directory..."
@@ -156,4 +146,3 @@ DISTRIBUTION=$(get_distro)
 install_dependencies "$DISTRIBUTION"
 open_firewall_port "$DISTRIBUTION"
 setup_log_dir "$DISTRIBUTION"
-setup_probe_dir "$DISTRIBUTION"
