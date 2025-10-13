@@ -16,7 +16,7 @@ api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 probe_utils = ProbeInfo()
 
-r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+r = redis.Redis(host=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'), decode_responses=True)
 pong = r.ping()
 logger.info(f"Redis ping: {pong}")
 
