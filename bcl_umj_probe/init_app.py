@@ -50,7 +50,7 @@ def init_probe():
 
 def validate_api_key(key: str = Depends(api_key_header)):
     _, hostname = probe_utils.gen_probe_register_data()
-    cursor, keys = r.scan(cursor=0, match=f'*{hostname}*')
+    cursor, keys = r.scan(cursor=0, match=f'*prb-*')
 
     if keys:
         for redis_key in keys:

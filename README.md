@@ -27,9 +27,9 @@ $ sudo ./restart.sh
 $ export X-UMJ-WFLW-API-KEY="umjiniti_api_key"
 $ export PRB-API-KEY="probe_api_key"
 
-# Add the following environment variables to the umj_probe service in docker-compose file ()
-- X-UMJ-WFLW-API-KEY=${X-UMJ-WFLW-API-KEY}
-- PRB-API-KEY=${PRB-API-KEY}
+# Add the following environment variables to the umj_probe service in docker-compose file (can remove after successful adoption)
+- X-UMJ-WFLW-API-KEY=
+- PRB-API-KEY=
 - UMJ-URL=
 - UMJ-USR=
 - UMJ-SITE=
