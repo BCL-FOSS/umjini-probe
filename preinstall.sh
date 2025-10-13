@@ -126,7 +126,7 @@ install_dependencies() {
     if ! python3 -m venv > /dev/null 2>&1; then
         echo "Installing python3.12-venv..."
         case "$DISTRO" in
-            debian|ubuntu) sudo apt install -y python3.12-venv ;;
+            debian|ubuntu) sudo apt install -y python3-venv ;;
             *)
                 echo "Unknown or unsupported distribution. Exiting."
                 exit 1
