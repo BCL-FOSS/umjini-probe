@@ -38,18 +38,12 @@ mcp_app = mcp.http_app(path="/mcp")
 api = FastAPI(title='Network Util API', lifespan=mcp_app.lifespan)
 
 async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: dict = {}, cookies: str = ''):
-    try:
-        async with httpx.AsyncClient() as client:
-            if cmd == 'p':
-                client.cookies.set("access_token", value=cookies)
-                return await client.post(url, json=payload, headers=headers)
-            elif cmd == 'g':
-                return await client.get(url, headers=headers)
-            
-    except Exception as e:
-        logger.error(e)
-    finally:
-        await client.aclose()
+    async with httpx.AsyncClient() as client:
+        if cmd == 'p':
+            client.cookies.set("access_token", value=cookies)
+            return await client.post(url, json=payload, headers=headers)
+        elif cmd == 'g':
+            return await client.get(url, headers=headers)
     
 @api.get("/api/status", dependencies=[Depends(rate_limiter(2, 5))])
 def status():
