@@ -52,7 +52,7 @@ async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: di
             return await client.post(url, json=payload, headers=headers)
         elif cmd == 'g':
             return await client.get(url, headers=headers)
-    
+        
 @api.get("/api/status", dependencies=[Depends(rate_limiter(2, 5))])
 def status():
     return {"status": "ok"}
@@ -71,8 +71,9 @@ async def init(init_data: InitCall):
 
         resp_data = await _make_http_request(cmd="g", url=init_url, headers=headers)
         if resp_data.status_code == 200:
-            access_token = resp_data.cookies.get("access_token")
+            access_token = resp_data.cookies.get("wkflw_token")
             logger.info(access_token)
+            await resp_data.aclose()
 
             enroll_rqst = await _make_http_request(
                 cmd="p",
@@ -81,7 +82,10 @@ async def init(init_data: InitCall):
                 cookies=access_token,
                 payload=payload,
             )
+            await enroll_rqst.aclose()
             return 200 if enroll_rqst.status_code == 200 else 400
+        else:
+            await resp_data.aclose()
     
     probe_data['url'] = init_data.prb_url
     probe_data['prb_api_key'] = init_data.prb_api_key
