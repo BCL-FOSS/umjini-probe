@@ -13,6 +13,13 @@ import logging
 from net_util_mcp import mcp
 import os
 
+class InitCall(BaseModel):
+    umj_url: str 
+    umj_usr: str
+    umj_site: str
+    umj_api_key: str
+    prb_api_key: str
+
 class ToolCall(BaseModel):
     action: str 
     params: dict 
@@ -49,16 +56,16 @@ async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: di
 def status():
     return {"status": "ok"}
 
-@api.get("/api/init", dependencies=[Depends(validate_api_key)])
-async def init():
+@api.post("/api/init", dependencies=[Depends(validate_api_key)])
+async def init(init_data: InitCall):
     async def enrollment(payload: dict = {}):
-        headers = {"X-UMJ-WFLW-API-KEY": os.environ.get('X-UMJ-WFLW-API-KEY')}
-        post_headers = {"X-UMJ-WFLW-API-KEY": os.environ.get('X-UMJ-WFLW-API-KEY'),
+        headers = {"X-UMJ-WFLW-API-KEY": init_data.umj_api_key}
+        post_headers = {"X-UMJ-WFLW-API-KEY": init_data.umj_api_key,
                         "Content-Type": "application/json"}
 
-        init_url = f"https://{os.environ.get('UMJ-URL')}/init?usr={os.environ.get('UMJ-USR')}"
+        init_url = f"https://{init_data.umj_url}/init?usr={init_data.umj_usr}"
         logger.info(init_url)
-        enroll_url = f"https://{os.environ.get('UMJ-URL')}/enroll?usr={os.environ.get('UMJ-USR')}&site={os.environ.get('UMJ-SITE')}"
+        enroll_url = f"https://{init_data.umj_url}/enroll?usr={init_data.umj_usr}&site={init_data.umj_site}"
         logger.info(enroll_url)
 
         resp_data = await _make_http_request(cmd="g", url=init_url, headers=headers)
@@ -75,9 +82,9 @@ async def init():
             )
             return 200 if enroll_rqst.status_code == 200 else 400
     
-    probe_data['url'] = os.environ.get('UMJ-URL')
-    probe_data['prb_api_key'] = os.environ.get('PRB-API-KEY')
-    probe_data['site'] = os.environ.get('UMJ-SITE')
+    probe_data['url'] = init_data.umj_url
+    probe_data['prb_api_key'] = init_data.prb_api_key
+    probe_data['site'] = init_data.umj_site
     logger.info(probe_data)
 
     if await enrollment(payload=probe_data) != 200:

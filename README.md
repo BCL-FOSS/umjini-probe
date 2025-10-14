@@ -23,19 +23,6 @@ $ sudo ./restart.sh
 
 ### To adopt to umjiniti-cloud
 ```bash
-# Shut down the probe, the export the umjiniti-cloud and probe API keys
-$ export X-UMJ-WFLW-API-KEY="umjiniti_api_key"
-$ export PRB-API-KEY="probe_api_key"
 
-# Add the following environment variables to the umj_probe service in docker-compose file (can remove after successful adoption)
-- X-UMJ-WFLW-API-KEY=
-- PRB-API-KEY=
-- UMJ-URL=
-- UMJ-USR=
-- UMJ-SITE=
-
-# Restart the probe
-$ sudo ./restart.sh
-
-# Visit /docs for GUI or send GET request to /api/init to adopt probe to umjiniti-cloud
+# Visit /docs for GUI or send POST request to /api/init to adopt probe to umjiniti-cloud
 ```
