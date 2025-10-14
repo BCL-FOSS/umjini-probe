@@ -19,6 +19,7 @@ class InitCall(BaseModel):
     umj_site: str
     umj_api_key: str
     prb_api_key: str
+    prb_url: str
 
 class ToolCall(BaseModel):
     action: str 
@@ -82,7 +83,7 @@ async def init(init_data: InitCall):
             )
             return 200 if enroll_rqst.status_code == 200 else 400
     
-    probe_data['url'] = init_data.umj_url
+    probe_data['url'] = init_data.prb_url
     probe_data['prb_api_key'] = init_data.prb_api_key
     probe_data['site'] = init_data.umj_site
     logger.info(probe_data)
