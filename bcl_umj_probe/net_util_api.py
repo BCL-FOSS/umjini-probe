@@ -63,7 +63,9 @@ async def init():
                         "Content-Type": "application/json"}
 
         init_url = f"https://{os.environ.get('UMJ-URL')}/init?usr={os.environ.get('UMJ-USR')}"
+        logger.info(init_url)
         enroll_url = f"https://{os.environ.get('UMJ-URL')}/enroll?usr={os.environ.get('UMJ-USR')}&site={os.environ.get('UMJ-SITE')}"
+        logger.info(enroll_url)
 
         resp_data = await _make_http_request(cmd="g", url=init_url, headers=headers)
         if resp_data.status_code == 200:
