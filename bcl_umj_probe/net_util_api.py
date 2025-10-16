@@ -20,6 +20,7 @@ class InitCall(BaseModel):
     umj_api_key: str
     prb_api_key: str
     prb_url: str
+    prb_name: str
 
 class ToolCall(BaseModel):
     action: str 
@@ -90,6 +91,7 @@ async def init(init_data: InitCall):
     probe_data['url'] = init_data.prb_url
     probe_data['prb_api_key'] = init_data.prb_api_key
     probe_data['site'] = init_data.umj_site
+    probe_data['name'] = init_data.prb_name
     logger.info(probe_data)
 
     if await enrollment(payload=probe_data) != 200:
