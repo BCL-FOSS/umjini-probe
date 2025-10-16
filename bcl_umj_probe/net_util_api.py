@@ -72,7 +72,7 @@ async def init(init_data: InitCall):
 
         resp_data = await _make_http_request(cmd="g", url=init_url, headers=headers)
         if resp_data.status_code == 200:
-            access_token = resp_data.cookies.get("wkflw_token")
+            access_token = resp_data.cookies.get("access_token")
             logger.info(access_token)
             await resp_data.aclose()
 
