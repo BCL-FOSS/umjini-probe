@@ -145,6 +145,7 @@ async def traceroute(target: Annotated[str, "The server or endpoint to trace."],
     log_message+=f"{code}\n\n"
     log_message+=f"{output}\n\n"
     log_message+=f"{error}"
+    logger.info(log_message)
 
     await log_alert.write_log(log_name=f"traceroute_result", message=log_message)
 
