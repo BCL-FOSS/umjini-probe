@@ -1,6 +1,6 @@
 # Caddyfile
 
-probe-a.baughcl.tech {
+probe.baughlabs.tech {
 
     handle /api/status* {
 		reverse_proxy umjprobe:8000
