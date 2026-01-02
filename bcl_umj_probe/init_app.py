@@ -23,6 +23,25 @@ logger.info(f"Redis ping: {pong}")
 def init_probe():
     prb_id, hstnm = probe_utils.gen_probe_register_data()
     cursor, keys = r.scan(cursor=0, match=f'*prb-*')
+    api_key_file = 'prb_api_key.txt'
+
+    if not keys or os.path.exists(api_key_file) is False:
+        probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
+        api_key = uuid.uuid4()
+
+        with open(api_key_file, "w") as file:
+            file.write(api_key.hex)
+
+        probe_data['api_key'] = bcrypt.hash(str(api_key))
+
+        str_hashmap = {str(k): str(v) for k, v in probe_data.items()}
+        result = r.hset(prb_id, mapping=str_hashmap)
+        logger.info(result)
+
+        if isinstance(result, int):
+            logger.info(probe_data)
+            logger.info(probe_utils.get_ifaces())
+            return prb_id, hstnm, probe_data
 
     if keys:
         for redis_key in keys:
@@ -31,22 +50,7 @@ def init_probe():
             prb_id = hash_data.get('prb_id')
             probe_data = hash_data
         return prb_id, hstnm, probe_data
-    else:
-        probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
-        api_key = uuid.uuid4()
-        probe_data['api_key'] = bcrypt.hash(str(api_key))
-
-        str_hashmap = {str(k): str(v) for k, v in probe_data.items()}
-        result = r.hset(prb_id, mapping=str_hashmap)
-        logger.info(result)
-
-        if isinstance(result, int):
-            logger.info(f"API Key for umjiniti probe {id}: {api_key}\n Store this is a secure location as it will not be displayed again.")
-            logger.info(probe_data)
-            logger.info(probe_utils.get_ifaces())
-            return prb_id, hstnm, probe_data
-        else:
-            raise SystemExit(130)
+        
 
 def validate_api_key(key: str = Depends(api_key_header)):
     _, hostname = probe_utils.gen_probe_register_data()

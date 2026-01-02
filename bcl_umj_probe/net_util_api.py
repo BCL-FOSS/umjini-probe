@@ -18,7 +18,6 @@ class InitCall(BaseModel):
     umj_usr: str
     umj_site: str
     umj_api_key: str
-    prb_api_key: str
     prb_url: str
     prb_name: str
 
@@ -87,9 +86,20 @@ async def init(init_data: InitCall):
             return 200 if enroll_rqst.status_code == 200 else 400
         else:
             await resp_data.aclose()
+
+    def retrieve_prb_api_key():
+        api_key_file = 'prb_api_key.txt'
+        if os.path.exists(api_key_file):
+            with open(api_key_file, "r") as file:
+                api_hex = file.read().strip()
+                bytes_object = bytes.fromhex(api_hex)
+                api_original = bytes_object.decode('utf-8')
+                logger.info(f"Retrieved API Key: {api_original}")
+                return api_original
+        return None
     
     probe_data['url'] = init_data.prb_url
-    probe_data['prb_api_key'] = init_data.prb_api_key
+    probe_data['prb_api_key'] = retrieve_prb_api_key()
     probe_data['site'] = init_data.umj_site
     probe_data['name'] = init_data.prb_name
     logger.info(probe_data)
