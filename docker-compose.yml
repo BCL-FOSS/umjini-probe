@@ -8,6 +8,14 @@ services:
     environment:
       - PROBE_DB=probedb
       - PROBE_DB_PORT=6369
+      - ONETIMESECRET_USER=${OTS_USER}
+      - ONETIMESECRET_KEY=${OTS_KEY}
+      - REGION=us  # Default region, can be "us" or "eu"
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SENDER=${SMTP_SENDER}
+      - SMTP_SENDER_APP_PASSWORD=${SMTP_SENDER_APP_PASSWORD}
+      - SMTP_RECEIVER=${SMTP_RECEIVER}
     depends_on:
       - umj_probe_redis
     volumes:

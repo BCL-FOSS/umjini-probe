@@ -16,3 +16,4 @@ dnspython
 fastapi-user-limiter
 python-dotenv
 aiofiles
+onetimesecret

@@ -7,6 +7,8 @@ from passlib.hash import bcrypt
 from utils.RedisDB import RedisDB
 import uuid
 import os
+from onetimesecret import OneTimeSecretCli
+from utils.EmailAlert import EmailAlert
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
@@ -20,6 +22,10 @@ r = redis.Redis(host=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_P
 pong = r.ping()
 logger.info(f"Redis ping: {pong}")
 
+email_alert = EmailAlert()
+
+cli = OneTimeSecretCli(os.environ.get('OTS_USER'), os.environ.get('OTS_KEY'), os.environ.get('REGION'))
+
 def init_probe():
     prb_id, hstnm = probe_utils.gen_probe_register_data()
     cursor, keys = r.scan(cursor=0, match=f'*prb-*')
@@ -27,6 +33,24 @@ def init_probe():
     if not keys:
         probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
         api_key = uuid.uuid4()
+
+        link = cli.create_link(api_key,ttl=int(os.environ.get('OTS_TTL')))
+
+        email_alert.send_email(
+            subject="umjiniti Probe API Key Information",
+            body=f"""
+            Hello,
+
+            Your umjiniti Probe has been initialized successfully.
+
+            Please use the following link to retrieve your API key. Note that this link will expire in {os.environ.get('OTS_TTL')} seconds.
+
+            API Key Retrieval Link: {link}
+
+            Thank you,
+            umjiniti Team
+            """
+        )
 
         probe_data['api_key'] = bcrypt.hash(str(api_key))
 
