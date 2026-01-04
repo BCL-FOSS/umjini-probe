@@ -23,14 +23,10 @@ logger.info(f"Redis ping: {pong}")
 def init_probe():
     prb_id, hstnm = probe_utils.gen_probe_register_data()
     cursor, keys = r.scan(cursor=0, match=f'*prb-*')
-    api_key_file = 'prb_api_key.txt'
 
-    if not keys or os.path.exists(api_key_file) is False:
+    if not keys:
         probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
         api_key = uuid.uuid4()
-
-        with open(api_key_file, "w") as file:
-            file.write(api_key.hex)
 
         probe_data['api_key'] = bcrypt.hash(str(api_key))
 
