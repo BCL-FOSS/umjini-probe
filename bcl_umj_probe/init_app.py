@@ -6,9 +6,10 @@ import logging
 from passlib.hash import bcrypt
 import os
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logging.getLogger("fakeredis").setLevel(logging.WARNING)
+logging.getLogger("docket.worker").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
