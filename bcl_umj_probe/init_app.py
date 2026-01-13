@@ -6,7 +6,7 @@ import logging
 from passlib.hash import bcrypt
 import os
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logging.getLogger("fakeredis").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
