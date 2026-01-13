@@ -75,7 +75,7 @@ dockersetup() {
   sudo apt-get update
 
   #sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-  sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-buildx -y
+  sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx -y
 
   sudo apt install docker-compose -y
 
