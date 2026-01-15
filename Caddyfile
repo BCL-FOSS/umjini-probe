@@ -2,15 +2,15 @@
 
 probe.baughlabs.tech {
 
-    handle /api/status* {
+    handle /v1/api/status* {
 		reverse_proxy umjprobe:8000
 	}
 
-	handle /api/init* {
+	handle /v1/api/init* {
 		reverse_proxy umjprobe:8000
 	}
 
-	handle /api/probe* {
+	handle /v1/api/probe* {
 		reverse_proxy umjprobe:8000
 	}
 

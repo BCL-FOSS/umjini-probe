@@ -12,6 +12,7 @@ from typing import Callable
 import logging
 from net_util_mcp import mcp
 import os
+from utils.RedisDB import RedisDB
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -40,6 +41,8 @@ logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
+prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
+
 prb_id, hstnm, probe_data = init_probe()
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
 
@@ -54,21 +57,21 @@ async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: di
         elif cmd == 'g':
             return await client.get(url, headers=headers)
         
-@api.get("/api/status", dependencies=[Depends(rate_limiter(2, 5))])
+@api.get("/v1/api/status", dependencies=[Depends(rate_limiter(2, 5))])
 def status():
     return {"status": "ok"}
 
-@api.post("/api/init", dependencies=[Depends(validate_api_key)])
+@api.post("/v1/api/init", dependencies=[Depends(validate_api_key)])
 async def init(init_data: InitCall):
+    init_url = f"https://{init_data.umj_url}/init?usr={init_data.umj_usr}"
+    logger.info(init_url)
+    enroll_url = f"https://{init_data.umj_url}/enroll?usr={init_data.umj_usr}&site={init_data.umj_site}"
+    logger.info(enroll_url)
+
     async def enrollment(payload: dict = {}):
         headers = {"X-UMJ-WFLW-API-KEY": init_data.umj_api_key}
         post_headers = {"X-UMJ-WFLW-API-KEY": init_data.umj_api_key,
                         "Content-Type": "application/json"}
-
-        init_url = f"https://{init_data.umj_url}/init?usr={init_data.umj_usr}"
-        logger.info(init_url)
-        enroll_url = f"https://{init_data.umj_url}/enroll?usr={init_data.umj_usr}&site={init_data.umj_site}"
-        logger.info(enroll_url)
 
         resp_data = await _make_http_request(cmd="g", url=init_url, headers=headers)
         if resp_data.status_code == 200:
@@ -90,6 +93,8 @@ async def init(init_data: InitCall):
 
         return None
     
+    await prb_db.connect_db()
+
     probe_data['url'] = init_data.prb_url
     probe_data['prb_api_key'] = init_data.prb_api_key
     probe_data['site'] = init_data.umj_site
@@ -99,10 +104,23 @@ async def init(init_data: InitCall):
     if await enrollment(payload=probe_data) != 200:
         return {"Error": "occurred during probe adoption"}, 400
     else:
-        return 200
+        probe_info = await prb_db.get_all_data(match=f"prb-*")
+        probe_info_dict = next(iter(probe_info.values()))
+        probe_id = probe_info_dict.get('prb_id')
+
+        umj_probe_data = {'url': init_data.prb_url,
+                          'site': init_data.umj_site,
+                          'name': init_data.prb_name,
+                          'umj_url': init_data.umj_url,
+                          'umj_url_init': init_url}
+
+        if await prb_db.upload_db_data(id=probe_id, data=umj_probe_data) > 0:
+            return 200
+        else:
+            return {"Error": "occurred during probe adoption"}, 400
         
-@api.post("/api/probe", dependencies=[Depends(validate_api_key)])
-def probe(tool_data: ToolCall):
+@api.post("/v1/api/exec", dependencies=[Depends(validate_api_key)])
+def exec(tool_data: ToolCall):
     """Host system data"""
     handler = prb_action_map.get(tool_data.action)
     if handler and tool_data.params is not None:
