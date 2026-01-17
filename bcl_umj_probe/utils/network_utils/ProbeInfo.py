@@ -10,6 +10,7 @@ from utils.network_utils.base.Network import Network
 import uuid
 import dns.resolver
 import dns.reversename
+import ipaddress
 
 
 class ProbeInfo(Network):
@@ -96,6 +97,42 @@ class ProbeInfo(Network):
                 )
 
         return stat_data if stat_data else None
+
+    def get_interface_subnet(swlf, interface: str):
+        addrs = psutil.net_if_addrs().get(interface, [])
+
+        for addr in addrs:
+            if addr.family.name == 'AF_INET':
+                ip = addr.address
+                netmask = addr.netmask
+
+                network = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
+
+                return {
+                    "interface": interface,
+                    "ip": ip,
+                    "netmask": netmask,
+                    "cidr": network.prefixlen,
+                    "subnet": str(network.network_address),
+                    "network": str(network)
+                }
+
+        return None
+
+    def get_default_interface_subnet():
+        gws = psutil.net_if_stats()
+        for iface, stats in gws.items():
+            if stats.isup:
+                addrs = psutil.net_if_addrs().get(iface, [])
+                for addr in addrs:
+                    if addr.family.name == 'AF_INET':
+                        network = ipaddress.IPv4Network(
+                            f"{addr.address}/{addr.netmask}",
+                            strict=False
+                        )
+                        return iface, network
+        return None
+
         
     def get_url_from_ip(self, ip_address: str, port: int | None = 8000, timeout: int = 2) -> str:
         host = ip_address

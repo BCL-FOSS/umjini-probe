@@ -26,14 +26,15 @@ def init_probe():
 
     if not keys:
         probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
+        host_interfaces = probe_utils.get_ifaces()
+        probe_data['iface_list'] = host_interfaces
+        logger.info(host_interfaces)
 
         str_hashmap = {str(k): str(v) for k, v in probe_data.items()}
         result = r.hset(prb_id, mapping=str_hashmap)
         logger.info(result)
 
         if isinstance(result, int):
-            logger.info(probe_data)
-            logger.info(probe_utils.get_ifaces())
             return prb_id, hstnm, probe_data
 
     if keys:

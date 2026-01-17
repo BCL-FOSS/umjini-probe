@@ -8,6 +8,10 @@ services:
     environment:
       - PROBE_DB=probedb
       - PROBE_DB_PORT=6369
+    network_mode: "host"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN 
     depends_on:
       - umj_probe_redis
     volumes:

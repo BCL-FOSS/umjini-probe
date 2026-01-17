@@ -3,6 +3,7 @@ from typing import Annotated
 from utils.network_utils.NetworkTest import NetworkTest
 from utils.network_utils.NetworkSNMP import NetworkSNMP
 from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.network_utils.NetworkDiscovery import NetworkDiscovery
 import logging
 import redis
 from fastapi import HTTPException, status
@@ -182,5 +183,29 @@ async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace
     await log_alert.write_log(log_name=f"dnstraceroute_result", message=log_message)
 
     return code, output, error
+
+@mcp.tool
+async def arp_scan():
+    """dnstraceroute is a traceroute utility to figure out the path that a DNS request is passing through to get
+       to  its destination.  Comparing it to a network traceroute can help identify if DNS traffic is routed via
+       any unwanted path."""
+     
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    net_discv = NetworkDiscovery()
+    net_discv.set_interface(probe_utils.get_ifaces()[0])
+
+    code, output, error = await net_discv.arp_scan()
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"dnstraceroute_result", message=log_message)
+
+    return code, output, error
+    
 
 

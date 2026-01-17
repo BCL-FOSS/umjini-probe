@@ -1,6 +1,7 @@
 import platform
 import logging
 import asyncio
+import subprocess
 
 class Network():
     
@@ -50,6 +51,7 @@ class Network():
     async def ssh_connect(self, host: str, user: str, password: str):
         command = (
             f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=accept-new "
+            f"{user}@{host} 'hostname'"
             )
         process = await asyncio.create_subprocess_shell(
             command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -64,4 +66,6 @@ class Network():
         return_code = await process.wait()  
         
         self.logger.info(return_code) 
+
+   
         

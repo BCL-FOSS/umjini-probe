@@ -25,6 +25,7 @@ RUN apt-get install -y \
 WORKDIR /home/quart
 
 RUN mkdir /home/quart/probedata
+RUN mkdir /home/quart/probedata/pcaps
 
 COPY bcl_umj_probe/requirements.txt ./
 

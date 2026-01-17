@@ -10,10 +10,6 @@ probe.baughlabs.tech {
 		reverse_proxy umjprobe:8000
 	}
 
-	handle /v1/api/probe* {
-		reverse_proxy umjprobe:8000
-	}
-
 	handle /docs* {
 		reverse_proxy umjprobe:8000
 	}

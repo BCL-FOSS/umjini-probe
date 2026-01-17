@@ -6,13 +6,13 @@ from init_app import (
     init_probe
 )
 import httpx
-from utils.network_utils.ProbeInfo import ProbeInfo
-from utils.network_utils.NetworkTest import NetworkTest
-from typing import Callable
 import logging
 from net_util_mcp import mcp
 import os
 from utils.RedisDB import RedisDB
+import threading
+from CoreClient import CoreClient
+import requests
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -23,20 +23,6 @@ class InitCall(BaseModel):
     prb_api_key: str
     prb_name: str
 
-class ToolCall(BaseModel):
-    action: str 
-    params: dict 
-
-probe_utils = ProbeInfo()
-net_test = NetworkTest()
-
-prb_action_map: dict[str, Callable[[dict], object]] = {
-    "prbdta": probe_utils.get_probe_data,
-    "prbprc": probe_utils.get_processes_by_names,
-    "prbprt": probe_utils.open_listening_ports,
-    "prbifc": probe_utils.get_iface_ips,
-}
-
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -45,6 +31,24 @@ prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE
 
 prb_id, hstnm, probe_data = init_probe()
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
+
+if probe_data['umj_url_init']:
+    try:
+        payload = {'usr': probe_data['assigned_user']}
+        headers = {'X-UMJ-WFLW-API-KEY': probe_data['umj_api_key']}
+ 
+        r = requests.get(probe_data['umj_url_init'], params=payload, headers=headers)
+        if r.status_code == 200:
+            umj_jwt_token = r.cookies['access_token']
+
+            ws_url = f"wss://{probe_data['umj_url']}/ws?prb=y&prb_id={probe_data['prb_id']}&unm={probe_data['assigned_user']}"
+            core_client = CoreClient(umj_url=probe_data['umj_url_init'], umj_ws_url=ws_url, umj_token=umj_jwt_token)
+
+            t = threading.Thread(target=core_client.run, daemon=True)
+            t.start()
+            logger.info("Started core socket")
+    except Exception as e:
+        logger.exception("Failed to start core socket.")
 
 mcp_app = mcp.http_app(path="/mcp")
 api = FastAPI(title='Network Util API', lifespan=mcp_app.lifespan)
@@ -111,17 +115,12 @@ async def init(init_data: InitCall):
         umj_probe_data = {'url': init_data.prb_url,
                           'site': init_data.umj_site,
                           'name': init_data.prb_name,
+                          'assigned_user': init_data.umj_usr,
                           'umj_url': init_data.umj_url,
-                          'umj_url_init': init_url}
+                          'umj_url_init': init_url,
+                          'umj_api_key': init_data.umj_api_key}
 
         if await prb_db.upload_db_data(id=probe_id, data=umj_probe_data) > 0:
             return 200
         else:
             return {"Error": "occurred during probe adoption"}, 400
-        
-@api.post("/v1/api/exec", dependencies=[Depends(validate_api_key)])
-def exec(tool_data: ToolCall):
-    """Host system data"""
-    handler = prb_action_map.get(tool_data.action)
-    if handler and tool_data.params is not None:
-        return handler(**tool_data.params)
