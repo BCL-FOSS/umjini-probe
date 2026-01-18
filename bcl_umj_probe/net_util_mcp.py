@@ -185,27 +185,88 @@ async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace
     return code, output, error
 
 @mcp.tool
-async def arp_scan():
-    """dnstraceroute is a traceroute utility to figure out the path that a DNS request is passing through to get
-       to  its destination.  Comparing it to a network traceroute can help identify if DNS traffic is routed via
-       any unwanted path."""
+async def arp_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
+    """ARP scan uses the ARP protocol to discover and fingerprint IP hosts on the network. Bypasses firewalls that block ICMP. Excellent for device inventory."""
      
     header_data = get_http_headers()
     verify_api(header_data)
 
     net_discv = NetworkDiscovery()
-    net_discv.set_interface(probe_utils.get_ifaces()[0])
 
-    code, output, error = await net_discv.arp_scan()
+    iface, network = probe_utils.get_default_interface_subnet()
+    net_discv.set_interface(iface=iface)
+
+    if interface is not None:
+        net_discv.set_interface(interface)
+        network = probe_utils.get_interface_subnet(interface=interface)['network']
+
+    code, output, error = await net_discv.arp_scan(subnet=network)
 
     log_message=f""
     log_message+=f"{code}\n\n"
     log_message+=f"{output}\n\n"
     log_message+=f"{error}"
 
-    await log_alert.write_log(log_name=f"dnstraceroute_result", message=log_message)
+    await log_alert.write_log(log_name=f"arpscan_result", message=log_message)
 
     return code, output, error
+
+@mcp.tool
+async def device_identifcation(enable_os_detection: Annotated[bool, "Enables OS detection + service identification scan. Service identification is enabled by default (the variable is set to False by default). If OS detection is requested, set this variable to True."] = False, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
+    """Device identification conducts OS and Service (port) identification scans for all endpoints on the network. If OS detection is enabled it creates more traffic noise however the perfomance should be negligible on most networks."""
+     
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    net_discv = NetworkDiscovery()
+
+    iface, network = probe_utils.get_default_interface_subnet()
+    net_discv.set_interface(iface=iface)
+
+    if interface is not None:
+        net_discv.set_interface(interface)
+        network = probe_utils.get_interface_subnet(interface=interface)['network']
+
+    if enable_os_detection is True:
+        code, output, error = await net_discv.device_identification(subnet=network, noise=True)
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
+
+    return code, output, error
+
+@mcp.tool
+async def snmp_scan(type: Annotated[str, "Enables OS detection + service identification scan. Service identification is enabled by default (the variable is set to False by default). If OS detection is requested, set this variable to True."] = False, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
+    """Device identification conducts OS and Service (port) identification scans for all endpoints on the network. If OS detection is enabled it creates more traffic noise however the perfomance should be negligible on most networks."""
+     
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    net_discv = NetworkDiscovery()
+
+    iface, network = probe_utils.get_default_interface_subnet()
+    net_discv.set_interface(iface=iface)
+
+    if interface is not None:
+        net_discv.set_interface(interface)
+        network = probe_utils.get_interface_subnet(interface=interface)['network']
+
+    code, output, error = await net_discv.snmp_scans(subnet=network, type=type)
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
+
+    return code, output, error
+
+
     
 
 

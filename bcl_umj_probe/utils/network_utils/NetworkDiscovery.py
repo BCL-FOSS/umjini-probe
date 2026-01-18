@@ -12,7 +12,7 @@ class NetworkDiscovery(Network):
 
         return code, output, error
     
-    async def device_detection(self, subnet: str, noise: False):
+    async def device_identification(self, subnet: str, noise: False):
         if noise is True:
             code, output, error = await self.run_shell_cmd(cmd=f"nmap -e {self.interface} -sS -O -sV {subnet}")
 
