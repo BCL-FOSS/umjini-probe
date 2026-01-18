@@ -212,7 +212,7 @@ async def arp_scan(interface: Annotated[str, "The physical network interface por
     return code, output, error
 
 @mcp.tool
-async def device_identifcation(enable_os_detection: Annotated[bool, "Enables OS detection + service identification scan. Service identification is enabled by default (the variable is set to False by default). If OS detection is requested, set this variable to True."] = False, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
+async def device_identifcation_scan(enable_os_detection: Annotated[bool, "Enables OS detection + service identification scan. Service identification is enabled by default (the variable is set to False by default). If OS detection is requested, set this variable to True."] = False, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."] = None):
     """Device identification conducts OS and Service (port) identification scans for all endpoints on the network. If OS detection is enabled it creates more traffic noise however the perfomance should be negligible on most networks."""
      
     header_data = get_http_headers()
@@ -227,8 +227,16 @@ async def device_identifcation(enable_os_detection: Annotated[bool, "Enables OS 
         net_discv.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
+    if enable_os_detection is True and target is not None:
+        code, output, error = await net_discv.device_identification_scan(subnet=target, noise=True)
+
     if enable_os_detection is True:
-        code, output, error = await net_discv.device_identification(subnet=network, noise=True)
+        code, output, error = await net_discv.device_identification_scan(subnet=network, noise=True)
+ 
+    if target is not None:
+        code, output, error = await net_discv.device_identification_scan(subnet=target)
+    else:
+        code, output, error = await net_discv.device_identification_scan(subnet=network)
 
     log_message=f""
     log_message+=f"{code}\n\n"
@@ -240,8 +248,8 @@ async def device_identifcation(enable_os_detection: Annotated[bool, "Enables OS 
     return code, output, error
 
 @mcp.tool
-async def snmp_scan(type: Annotated[str, "Enables OS detection + service identification scan. Service identification is enabled by default (the variable is set to False by default). If OS detection is requested, set this variable to True."] = False, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
-    """Device identification conducts OS and Service (port) identification scans for all endpoints on the network. If OS detection is enabled it creates more traffic noise however the perfomance should be negligible on most networks."""
+async def snmp_scan(type: Annotated[str, "Determines the type of SNMP scan used. To identify if SNMP is active on the specified target, set variable to 'snmp_opn'. If SNMP scripts to run on specified target are provided, set variable to 'snmp_enum'. To retrieve all available SNMP information from the specified target, set variable to 'snmp_all'."] = None, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."] = None, scripts: Annotated[str, "The nmap SNMP scan scripts to run. Defaults scripts retrieve system decriptions and system network interface data."] = None):
+    """SNMP scan identifies SNMP capable network devices, runs specified nmap SNMP scripts to perform SNMPv3 GET requests and SNMP polling and retireves all available SNMP data for the specified target."""
      
     header_data = get_http_headers()
     verify_api(header_data)
@@ -255,7 +263,142 @@ async def snmp_scan(type: Annotated[str, "Enables OS detection + service identif
         net_discv.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
-    code, output, error = await net_discv.snmp_scans(subnet=network, type=type)
+    if target is not None and scripts is not None:
+        code, output, error = await net_discv.snmp_scans(subnet=target, type=type, scripts=scripts)
+
+    if scripts is not None:
+        code, output, error = await net_discv.snmp_scans(subnet=network, type=type, scripts=scripts)
+
+    if target is not None:
+        code, output, error = await net_discv.snmp_scans(subnet=target, type=type)
+    else:
+        code, output, error = await net_discv.snmp_scans(subnet=network, type=type)
+
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"{type}_scan_result", message=log_message)
+
+    return code, output, error
+
+@mcp.tool
+async def device_fingerprint_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The network device IP or hostname to run the scan on."] = None, limit: Annotated[bool, "Enable more aggresive OS detection or limited OS detection. If aggresive OS identification is specified, set variable to False"] = True):
+    """Device fingerprint scan performs OS identification for the specified network host or network devices within the specified subnet."""
+     
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    net_discv = NetworkDiscovery()
+
+    iface, network = probe_utils.get_default_interface_subnet()
+    net_discv.set_interface(iface=iface)
+
+    if interface is not None:
+        net_discv.set_interface(interface)
+        network = probe_utils.get_interface_subnet(interface=interface)['network']
+
+    if target is not None:
+        code, output, error = await net_discv.device_fingerprint_scan(ip=target, limit=limit)
+    else:
+        code, output, error = await net_discv.device_fingerprint_scan(ip=network, limit=limit)
+  
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"devicefingerprint_result", message=log_message)
+
+    return code, output, error
+
+@mcp.tool
+async def port_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The network device IP or hostname to run the scan on."] = None, ports: Annotated[str, "The ports to scan for on the specified target. The specified ports should be in the following format: 'port1,port2,port3,port4...'"] = None):
+    """"""
+     
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    net_discv = NetworkDiscovery()
+
+    iface, network = probe_utils.get_default_interface_subnet()
+    net_discv.set_interface(iface=iface)
+
+    if interface is not None:
+        net_discv.set_interface(interface)
+        network = probe_utils.get_interface_subnet(interface=interface)['network']
+
+    if target is not None and ports is not None:
+        code, output, error = await net_discv.port_scan(subnet=target, ports=ports)
+
+    if target is not None:
+        code, output, error = await net_discv.port_scan(subnet=target)
+
+    if ports is not None:
+        code, output, error = await net_discv.port_scan(ports=ports)
+
+    else:
+        code, output, error = await net_discv.port_scan(subnet=network)
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
+
+    return code, output, error
+
+@mcp.tool
+async def custom_scan( options: Annotated[str, "The nmap scan options to run."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The network device IP or hostname to run the scan on."] = None):
+    """"""
+     
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    net_discv = NetworkDiscovery()
+
+    iface, network = probe_utils.get_default_interface_subnet()
+    net_discv.set_interface(iface=iface)
+
+    if interface is not None:
+        net_discv.set_interface(interface)
+        network = probe_utils.get_interface_subnet(interface=interface)['network']
+
+    if target is not None and options is not None:
+        code, output, error = await net_discv.custom_scan(subnet=target, options=options)
+    
+    if options is not None:
+        code, output, error = await net_discv.custom_scan(subnet=network, options=options)
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
+
+    return code, output, error
+
+@mcp.tool
+async def full_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
+    """"""
+     
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    net_discv = NetworkDiscovery()
+
+    iface, network = probe_utils.get_default_interface_subnet()
+    net_discv.set_interface(iface=iface)
+
+    if interface is not None:
+        net_discv.set_interface(interface)
+        network = probe_utils.get_interface_subnet(interface=interface)['network']
+
+    code, output, error = await net_discv.full_network_scan(subnet=network)
 
     log_message=f""
     log_message+=f"{code}\n\n"
