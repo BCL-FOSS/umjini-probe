@@ -4,6 +4,7 @@ from utils.network_utils.NetworkTest import NetworkTest
 from utils.network_utils.NetworkSNMP import NetworkSNMP
 from utils.network_utils.ProbeInfo import ProbeInfo
 from utils.network_utils.NetworkDiscovery import NetworkDiscovery
+from utils.network_utils.PacketCapture import PacketCapture
 import logging
 import redis
 from fastapi import HTTPException, status
@@ -408,6 +409,101 @@ async def full_scan(interface: Annotated[str, "The physical network interface po
     await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
 
     return code, output, error
+
+@mcp.tool
+async def pcap_local(interface: Annotated[str, "The physical network interface port the packet capture will run on. Defaults to the primary interface on the host."] = None, cap_count: Annotated[int, "The number of packets to capture. Default is set to 50."] = None):
+    """"""
+
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    pcap = PacketCapture()
+
+    iface, network = probe_utils.get_default_interface_subnet()
+
+    if interface is not None and cap_count is not None:
+        code, output, error = await pcap.pcap_local(interface=interface, cap_count=cap_count)
+
+    if interface is not None:
+        code, output, error = await pcap.pcap_local(interface=interface)
+
+    if cap_count is not None:
+        code, output, error = await pcap.pcap_local(interface=iface, cap_count=cap_count)
+
+    if cap_count is None and interface is None:
+        code, output, error = await pcap.pcap_local(interface=iface)
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
+
+    return code, output, error
+
+@mcp.tool
+async def pcap_remote_linux(remote_interface: Annotated[str, "The physical network interface port of the remote linux host the packet capture will run on."], host: Annotated[str, "the remote linux host the packet capture will run on."], username: Annotated[str, "The username of a sudo level user of the remote linux host."], password: Annotated[str, "The password of the sudo level user on the remote linux host."], cap_count: Annotated[int, "The number of packets to capture. Default is set to 50."] = None):
+    """"""
+
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    pcap = PacketCapture()
+
+    pcap.set_host(host=host)
+
+    pcap.set_credentials(user=username, password=password)
+
+    if cap_count is not None:
+        code, output, error = await pcap.pcap_remote_linux(remote_iface=remote_interface, cap_count=cap_count)
+    else:
+        code, output, error = await pcap.pcap_remote_linux(remote_iface=remote_interface)
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
+
+    return code, output, error
+
+@mcp.tool
+async def pcap_remote_windows(remote_interface: Annotated[str, "The physical network interface port of the remote windows server host the packet capture will run on."], host: Annotated[str, "the remote windows server host the packet capture will run on."], username: Annotated[str, "The username of an admin level user of the remote linux host."], password: Annotated[str, "The password of an admin level user on the remote linux host."], duration: Annotated[int, "The number of seconds the packet capture will run on the windows server host."] = None):
+    """"""
+
+    header_data = get_http_headers()
+    verify_api(header_data)
+
+    pcap = PacketCapture()
+
+    pcap.set_host(host=host)
+
+    pcap.set_credentials(user=username, password=password)
+
+    if duration is not None:
+        code, output, error = await pcap.pcap_remote_windows(remote_iface=remote_interface, duration=duration)
+    else:
+        code, output, error = await pcap.pcap_remote_linux(remote_iface=remote_interface)
+
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
+
+    return code, output, error
+
+
+
+
+
+
+
+
+
 
 
     

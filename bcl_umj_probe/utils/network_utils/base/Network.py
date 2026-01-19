@@ -32,7 +32,6 @@ class Network():
         command = (
             f"sshpass -p '{password}' ssh -tt -o StrictHostKeyChecking=no "
             f"{user}@{host} 'bash {cmd}'"
-            # f"{user}@{host} 'echo {password} | sudo -S bash /usr/local/bin/ubnt-ssl-config.sh {host}'"
             )
         process = await asyncio.create_subprocess_shell(
             command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -47,6 +46,8 @@ class Network():
         return_code = await process.wait()  
         
         self.logger.info(return_code)
+
+        return return_code, stdout.decode(), stderr.decode()
     
     async def ssh_connect(self, host: str, user: str, password: str):
         command = (
@@ -66,6 +67,8 @@ class Network():
         return_code = await process.wait()  
         
         self.logger.info(return_code) 
+
+        return return_code, stdout.decode(), stderr.decode()
 
    
         

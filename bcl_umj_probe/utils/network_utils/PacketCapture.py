@@ -8,10 +8,14 @@ logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
-class PacketCap(Network):
-    def __init__(self, host: str, user: str, password: str):
+class PacketCapture(Network):
+    def __init__(self):
         super().__init__()
+        
+    def set_host(self, host: str):
         self.host = host
+
+    def set_credentials(self, user: str, password: str):
         self.user = user
         self.password = password
 
@@ -22,17 +26,29 @@ class PacketCap(Network):
         pcap_cmd = f"cd /home/{self.user} && tcpdump -i {remote_iface} -s0 -c {cap_count} -w {pcap_file_name}"
         copy_cmd = f"sshpass -p '{self.password}' rsync -avzP -e ssh {self.user}@{self.host}:/home/{self.user}/{pcap_file_name} /home/quart/probedata/pcaps"
         
-        await self.ssh_connect(host=self.host, user=self.user, password=self.password)
-        await self.run_ssh_cmd(host=self.host, user=self.user, password=self.password, cmd=pcap_cmd)
-        await self.run_shell_cmd(cmd=copy_cmd)
+        init_code, init_output, init_error = await self.ssh_connect(host=self.host, user=self.user, password=self.password)
+        if init_code != 0:
+            logger.info(init_output)
+            logger.info(init_error)
+            return 1
+        
+        ssh_code, ssh_output, ssh_error = await self.run_ssh_cmd(host=self.host, user=self.user, password=self.password, cmd=pcap_cmd)
+        if ssh_code != 0:
+            logger.info(ssh_output)
+            logger.info(ssh_error)
+            return 1
+        
+        shell_code, shell_output, shell_error = await self.run_shell_cmd(cmd=copy_cmd)
 
-    async def pcap_remote_windows(self, remote_iface: str):
+        return shell_code, shell_output, shell_error
+
+    async def pcap_remote_windows(self, remote_iface: str, duration: int = 30):
         time_stamp = datetime.now(timezone.utc).isoformat()
         OUTPUT_DIR = Path("/home/quart/probedata/pcaps")
         pcap_file_name = OUTPUT_DIR / f"{self.host}_capture_{time_stamp}.pcap"
 
         TSHARK_PATH=f'C:\Program Files\Wireshark\tshark.exe'
-        DURATION = 30  # seconds
+        DURATION = duration  # seconds
 
         pcap_cmd = f"'{TSHARK_PATH}' -D && '{TSHARK_PATH}' -i {remote_iface} -a duration:{DURATION}"
 
@@ -62,14 +78,24 @@ class PacketCap(Network):
                 logger.error(f"[!] tshark stderr:\n{stderr.decode(errors='ignore')}")
 
         finally:
-            await proc.wait()
+            stdout, stderr = await proc.communicate()
+    
+            self.logger.error(stderr.decode())
+        
+            self.logger.info(stdout.decode())
+
+            return_code = await proc.wait()
+
+        return return_code, stdout, stderr
 
     async def pcap_local(self, interface: str, cap_count: int = 50):
         time_stamp = datetime.now(timezone.utc).isoformat()
         pcap_file_name = f"/home/quart/probedata/pcaps/{self.host}_capture_{time_stamp}.pcap"
         pcap_cmd = f"tcpdump -i {interface} -s0 -c {cap_count} -w {pcap_file_name}"
         
-        await self.run_shell_cmd(cmd=pcap_cmd)
+        code, output, error = await self.run_shell_cmd(cmd=pcap_cmd)
+
+        return code, output, error
 
         
 
