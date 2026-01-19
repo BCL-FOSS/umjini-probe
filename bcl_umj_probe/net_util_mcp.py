@@ -58,7 +58,7 @@ def verify_api(headers: dict[str, str]) -> None:
                         detail="Invalid or missing API key"
                 )
 
-mcp = FastMCP(name="Network Util MCP")
+mcp = FastMCP(name="umjiniti-probe: network management utility")
 
 @mcp.tool
 async def speedtest_server(options: Annotated[str, "Additional command line flags to add to the iperf3 command."] = None, host: Annotated[str, "The IP address of the incoming interface the iperf server binds to. Defaults to 0.0.0.0 to bind to all available interfaces. This should be set for multihomed umjiniti probes."] = None):
@@ -181,7 +181,7 @@ async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace
     log_message+=f"{output}\n\n"
     log_message+=f"{error}"
 
-    await log_alert.write_log(log_name=f"dnstraceroute_result", message=log_message)
+    await log_alert.write_log(log_name=f"dns_traceroute_result", message=log_message)
 
     return code, output, error
 
@@ -208,7 +208,7 @@ async def arp_scan(interface: Annotated[str, "The physical network interface por
     log_message+=f"{output}\n\n"
     log_message+=f"{error}"
 
-    await log_alert.write_log(log_name=f"arpscan_result", message=log_message)
+    await log_alert.write_log(log_name=f"arp_scan_result", message=log_message)
 
     return code, output, error
 
@@ -244,7 +244,7 @@ async def device_identifcation_scan(enable_os_detection: Annotated[bool, "Enable
     log_message+=f"{output}\n\n"
     log_message+=f"{error}"
 
-    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
+    await log_alert.write_log(log_name=f"device_id_result", message=log_message)
 
     return code, output, error
 
@@ -311,13 +311,13 @@ async def device_fingerprint_scan(interface: Annotated[str, "The physical networ
     log_message+=f"{output}\n\n"
     log_message+=f"{error}"
 
-    await log_alert.write_log(log_name=f"devicefingerprint_result", message=log_message)
+    await log_alert.write_log(log_name=f"device_fingerprint_result", message=log_message)
 
     return code, output, error
 
 @mcp.tool
 async def port_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The network device IP or hostname to run the scan on."] = None, ports: Annotated[str, "The ports to scan for on the specified target. The specified ports should be in the following format: 'port1,port2,port3,port4...'"] = None):
-    """"""
+    """Port scan identifies the open ports (services) open on all devices within a subnet or on a specified network host target."""
      
     header_data = get_http_headers()
     verify_api(header_data)
@@ -354,7 +354,7 @@ async def port_scan(interface: Annotated[str, "The physical network interface po
 
 @mcp.tool
 async def custom_scan( options: Annotated[str, "The nmap scan options to run."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The network device IP or hostname to run the scan on."] = None):
-    """"""
+    """Custom scan runs an nmap scan with the specified commandline options on all devices within a subnet or on the specified network host target."""
      
     header_data = get_http_headers()
     verify_api(header_data)
@@ -385,7 +385,7 @@ async def custom_scan( options: Annotated[str, "The nmap scan options to run."],
 
 @mcp.tool
 async def full_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
-    """"""
+    """Full scan runs a full network device discovery an a specified subnet. Enable OS detection, version detection, script scanning, and traceroute."""
      
     header_data = get_http_headers()
     verify_api(header_data)
@@ -412,7 +412,7 @@ async def full_scan(interface: Annotated[str, "The physical network interface po
 
 @mcp.tool
 async def pcap_local(interface: Annotated[str, "The physical network interface port the packet capture will run on. Defaults to the primary interface on the host."] = None, cap_count: Annotated[int, "The number of packets to capture. Default is set to 50."] = None):
-    """"""
+    """pcap local captures and logs ingress and egress traffic on a local network interface using tcpdump. PCAP results are stored in '/home/quart/probedata/pcaps'."""
 
     header_data = get_http_headers()
     verify_api(header_data)
@@ -444,7 +444,7 @@ async def pcap_local(interface: Annotated[str, "The physical network interface p
 
 @mcp.tool
 async def pcap_remote_linux(remote_interface: Annotated[str, "The physical network interface port of the remote linux host the packet capture will run on."], host: Annotated[str, "the remote linux host the packet capture will run on."], username: Annotated[str, "The username of a sudo level user of the remote linux host."], password: Annotated[str, "The password of the sudo level user on the remote linux host."], cap_count: Annotated[int, "The number of packets to capture. Default is set to 50."] = None):
-    """"""
+    """pcap remote linux captures and logs ingress and egress traffic on a remote linux host's specified network interface using tcpdump. Rsync copies the remote PCAPS results from the remote linux host to the local probe '/probedata/pcaps' directory."""
 
     header_data = get_http_headers()
     verify_api(header_data)
@@ -471,7 +471,7 @@ async def pcap_remote_linux(remote_interface: Annotated[str, "The physical netwo
 
 @mcp.tool
 async def pcap_remote_windows(remote_interface: Annotated[str, "The physical network interface port of the remote windows server host the packet capture will run on."], host: Annotated[str, "the remote windows server host the packet capture will run on."], username: Annotated[str, "The username of an admin level user of the remote linux host."], password: Annotated[str, "The password of an admin level user on the remote linux host."], duration: Annotated[int, "The number of seconds the packet capture will run on the windows server host."] = None):
-    """"""
+    """pcap remote windows captures and logs ingress and egress traffic on a remote windows host's specified network interface using tshark (commandline wireshark) and npcap. Remote PCAP results are written to the local '/probedata/pcaps' directory from the stdout output from the ssh session."""
 
     header_data = get_http_headers()
     verify_api(header_data)

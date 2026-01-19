@@ -7,7 +7,7 @@ aiohttp
 manuf
 pysnmp
 httpx
-fastmcp
+fastmcp<3
 fastapi
 redis
 passlib

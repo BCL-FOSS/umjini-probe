@@ -6,6 +6,7 @@ from typing import Callable
 from utils.network_utils.NetworkDiscovery import NetworkDiscovery
 from utils.network_utils.NetworkTest import NetworkTest
 from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.network_utils.PacketCapture import PacketCapture
 import os
 import logging
 import inspect
@@ -14,6 +15,7 @@ import httpx
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
+pcap = PacketCapture()
 probe_util = ProbeInfo()
 
 net_discovery.set_interface(probe_util.get_ifaces()[0])
@@ -21,15 +23,18 @@ net_discovery.set_interface(probe_util.get_ifaces()[0])
 action_map: dict[str, Callable[[dict], object]] = {
     "trcrt_dns": net_test.dnstraceroute,
     "trcrt": net_test.traceroute,
+    "test_srvr": net_test.iperf_server,
+    "test_clnt": net_test.iperf_client,
     "arp": net_discovery.arp_scan,
-    "dev_classify": net_discovery.device_classification,
-    "dev_detect": net_discovery.device_detection,
-    "dev_os_id": net_discovery.device_fingerprint,
+    "dev_classify": net_discovery.custom_scan,
+    "dev_id": net_discovery.device_identification_scan,
+    "dev_fngr": net_discovery.device_fingerprint_scan,
     "net_scan": net_discovery.full_network_scan,
     "snmp_scans": net_discovery.snmp_scans,
-    "sw_detect": net_discovery.switch_detection,
-    "trcrt_subnet": net_discovery.traceroute_scan,
-    "wap_detect": net_discovery.wirelss_ap_detection    
+    "service_id": net_discovery.port_scan,
+    "pcap_lcl": pcap.pcap_local,
+    "pcap_tux": pcap.pcap_remote_linux,
+    "pcap_win": pcap.pcap_remote_windows
 }
 
 class CoreClient:
@@ -65,7 +70,7 @@ class CoreClient:
                 ) as ws:
                     self.logger.info(f"Connected to {ws_url}")
                     backoff = 1  # reset backoff on success
-                    await self.interact(ws, site=probe_data_dict.get('site'))
+                    await self.interact(ws, probe_obj=probe_data_dict)
 
             except (ConnectionClosed, Exception) as e:
                 self.logger.error(f"WebSocket error: {e}")
@@ -98,6 +103,11 @@ class CoreClient:
                         action = raw_message.get("act")
                         params = raw_message.get("prms")
 
+                        match action:
+                            case 'pcap_tux' | 'pcap_win':
+                                pcap.set_host(host=raw_message.get('host'))
+                                pcap.set_credentials(user=raw_message.get('usr'), password=raw_message.get('pwd'))
+                                
                         # handle probe actions sent from umjiniti core
                         handler = action_map.get(action)
                         if handler and params:
@@ -116,14 +126,7 @@ class CoreClient:
                         umj_result_data['site'] = probe_obj.get('site')
                         umj_result_data['act_rslt'] = result
                         umj_result_data['prb_id'] = probe_obj.get('prb_id')
-
-                        match action:
-                            case 'lcldt':
-                                umj_result_data['type'] = 'lcldt_msg'
-                            case 'wifi_srvy_json':
-                                umj_result_data['type'] = 'srvy_msg'
-                            case 'dscv':
-                                umj_result_data['type'] = 'dscv_msg'
+                        umj_result_data['type'] = f'{action}_rslt_msg'
 
                         await ws.send(umj_result_data)
                 else:
