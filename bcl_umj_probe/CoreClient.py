@@ -98,37 +98,39 @@ class CoreClient:
                 raw_message = await ws.recv()
 
                 if isinstance(raw_message, dict):
-                    probe_id = raw_message.get('prb_id')
-                    if probe_id and probe_id == probe_obj.get('prb_id'):
-                        action = raw_message.get("act")
-                        params = raw_message.get("prms")
+                    if raw_message.get('remote_act') == 'prb_analysis':
+                        probe_id = raw_message.get('prb_id')
+                        if probe_id and probe_id == probe_obj.get('prb_id'):
+                            action = raw_message.get("act")
+                            params = raw_message.get("prms")
 
-                        match action:
-                            case 'pcap_tux' | 'pcap_win':
-                                pcap.set_host(host=raw_message.get('host'))
-                                pcap.set_credentials(user=raw_message.get('usr'), password=raw_message.get('pwd'))
-                                
-                        # handle probe actions sent from umjiniti core
-                        handler = action_map.get(action)
-                        if handler and params:
-                            if inspect.iscoroutinefunction(handler):
-                                result = await handler(**params)
-                            else:
-                                result = handler(**params)
-                        
-                        if handler:
-                            if inspect.iscoroutinefunction(handler):
-                                result = await handler()
-                            else:
-                                result = handler()
+                            match action:
+                                case 'pcap_tux' | 'pcap_win':
+                                    pcap.set_host(host=raw_message.get('host'))
+                                    pcap.set_credentials(user=raw_message.get('usr'), password=raw_message.get('pwd'))
+                                    
+                            # handle probe actions sent from umjiniti core
+                            handler = action_map.get(action)
+                            if handler and params:
+                                if inspect.iscoroutinefunction(handler):
+                                    result = await handler(**params)
+                                else:
+                                    result = handler(**params)
                             
-                        umj_result_data = {}
-                        umj_result_data['site'] = probe_obj.get('site')
-                        umj_result_data['act_rslt'] = result
-                        umj_result_data['prb_id'] = probe_obj.get('prb_id')
-                        umj_result_data['type'] = f'{action}_rslt_msg'
+                            if handler:
+                                if inspect.iscoroutinefunction(handler):
+                                    result = await handler()
+                                else:
+                                    result = handler()
+                                
+                            umj_result_data = {}
+                            umj_result_data['site'] = probe_obj.get('site')
+                            umj_result_data['act_rslt'] = result
+                            umj_result_data['prb_id'] = probe_obj.get('prb_id')
+                            umj_result_data['act_rslt_type'] = f'{action}'
+                            umj_result_data['act'] = "prb_act_rslt"
 
-                        await ws.send(umj_result_data)
+                            await ws.send(umj_result_data)
                 else:
                     pass 
                 
