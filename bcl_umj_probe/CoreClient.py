@@ -135,26 +135,23 @@ class CoreClient:
                     pass 
                 
         async def heartbeat():
-            ping = {
+            while True:
+                ping = {
                     "sess_id": probe_obj.get('prb_id'),
                     "site": probe_obj.get('site'), 
                     "act": "heart_beat"
                     }
-            
-            while True:
                 await ws.send(ping)
                 await asyncio.sleep(30)
 
         async def netmap():
-            
-            await net_discovery.arp_scan()
-            ping = {
-                    "sess_id": probe_obj.get('prb_id'),
-                    "site": probe_obj.get('site'), 
-                    "act": "net_map"
-                    }
-            
             while True:
+                await net_discovery.arp_scan()
+                ping = {
+                        "sess_id": probe_obj.get('prb_id'),
+                        "site": probe_obj.get('site'), 
+                        "act": "net_map"
+                        }
                 await ws.send(ping)
                 await asyncio.sleep(600)
 
