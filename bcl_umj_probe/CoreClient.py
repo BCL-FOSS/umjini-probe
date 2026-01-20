@@ -155,7 +155,7 @@ class CoreClient:
                 await ws.send(ping)
                 await asyncio.sleep(600)
 
-        await asyncio.gather(receive(), heartbeat(), netmap())
+        await asyncio.gather(receive(), heartbeat())
 
     def run(self):
         asyncio.run(self.connect_with_backoff(ws_url=self.umj_ws, init_url=self.umj_url, cookie=self.umj_token))
