@@ -6,7 +6,7 @@ services:
       dockerfile: bcl_umj_probe/Dockerfile
     container_name: umjprobe
     environment:
-      - PROBE_DB=probedb
+      - PROBE_DB=127.0.0.1
       - PROBE_DB_PORT=6369
     network_mode: "host"
     cap_add:
@@ -16,9 +16,6 @@ services:
       - umj_probe_redis
     volumes:
       - probe_app_data:/home/quart/probedata
-    ports:
-      - "7969:7969/tcp"
-      - "7968:7968/tcp"
 
   umj_probe_redis:
     image: redis:latest
