@@ -6,7 +6,7 @@ services:
       dockerfile: bcl_umj_probe/Dockerfile
     container_name: umjprobe
     environment:
-      - PROBE_DB=127.0.0.1
+      - PROBE_DB=probedb
       - PROBE_DB_PORT=6369
     network_mode: "host"
     cap_add:
