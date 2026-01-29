@@ -38,7 +38,7 @@ class NetworkSNMP(Network):
             "if_in_packets": '1.3.6.1.2.1.2.2.1.11', 
             "if_out_packets": '1.3.6.1.2.1.2.2.1.17',
         }
-        self.NEW_OIDS = self.OIDS = {
+        self.NEW_OIDS = {
             # System
             "uptime": "1.3.6.1.2.1.1.3.0",
             "hostname": "1.3.6.1.2.1.1.5.0",
