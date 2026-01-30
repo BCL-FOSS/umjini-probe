@@ -40,7 +40,6 @@ mcp_app = mcp.http_app(path="/mcp")
 @asynccontextmanager
 async def combined_lifespan(app:FastAPI):
     async with mcp_app.lifespan(app):
-        # --- STARTUP logic (runs once on app start) ---
         # idempotent guard
         if getattr(app.state, "core_client_started", False) is False:
             app.state.core_client_started = True
