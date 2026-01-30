@@ -302,8 +302,8 @@ class CoreClient:
             stop_event = asyncio.Event()
             asyncio.create_task(core_client.run(stop_event))
         """
-        logger = getattr(self, "logger", logging.getLogger(__name__))
-        logger.info("CoreClient.run starting")
+      
+        self.logger.info("CoreClient.run starting")
         # store ref so external stop() can set it
         if stop_event is None:
             stop_event = asyncio.Event()
@@ -313,9 +313,9 @@ class CoreClient:
         try:
             await self.connect_with_backoff(ws_url=self.umj_ws, access_token=self.umj_token, init_url=self.umj_url, stop_event=stop_event)
         except asyncio.CancelledError:
-            logger.info("CoreClient.run cancelled")
+            self.logger.info("CoreClient.run cancelled")
             raise
         except Exception:
-            logger.exception("Unhandled exception in CoreClient.run")
+            self.logger.exception("Unhandled exception in CoreClient.run")
         finally:
-            logger.info("CoreClient.run finished")
+            self.logger.info("CoreClient.run finished")
