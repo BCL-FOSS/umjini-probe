@@ -101,15 +101,11 @@ class CoreClient:
                 # We'll supply a list of tuples for compatibility
                 "Cookie": f"access_token={access_token}"
             }
-            # websockets.connect expects extra_headers param name (not additional_headers) for latest versions
-            extra_headers = [("Cookie", f"access_token={access_token}")]
 
             try:
                 async with websockets.connect(
                     uri=ws_url,
-                    extra_headers=headers,
-                    ping_interval=20,
-                    ping_timeout=10,
+                    additional_headers=headers
                 ) as ws:
                     self.logger.info(f"Connected to {ws_url}")
                     backoff = 1.0
