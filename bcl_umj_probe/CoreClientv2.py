@@ -108,11 +108,11 @@ class CoreClient:
             try:
                 async with websockets.connect(
                     uri=ws_url,
-                    extra_headers=extra_headers,
+                    extra_headers=headers,
                     ping_interval=20,
                     ping_timeout=10,
                 ) as ws:
-                    self.logger.info("Connected to %s", ws_url)
+                    self.logger.info(f"Connected to {ws_url}")
                     backoff = 1.0
                     retry_counter = 0
 
