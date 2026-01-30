@@ -185,7 +185,7 @@ class CoreClient:
 
         logger.info("CoreClient: exiting connect_with_backoff")
 
-    async def interact(self, ws: websockets.WebSocketClientProtocol, probe_obj: dict, stop_event: Optional[asyncio.Event] = None):
+    async def interact(self, ws: ClientConnection, probe_obj: dict, stop_event: Optional[asyncio.Event] = None):
         """
         Run receive and heartbeat tasks concurrently until one finishes or stop_event is set.
         Ensures tasks are cancelled and cleaned up properly.
