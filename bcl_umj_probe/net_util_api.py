@@ -76,9 +76,9 @@ async def combined_lifespan(app:FastAPI):
                         else:
                             logger.warning("Init returned no access_token cookie; skipping CoreClient startup")
                     else:
-                        logger.warning("Init request returned status %s; skipping CoreClient startup", resp.status_code)
+                        logger.warning(f"Init request returned status {resp.status_code}; skipping CoreClient startup")
                 except Exception as e:
-                    logger.exception("Failed to start CoreClient during startup: %s", e)
+                    logger.exception(f"Failed to start CoreClient during startup: {e}")
             else:
                 logger.info("No umj_url_init configured; not starting CoreClient")
         
