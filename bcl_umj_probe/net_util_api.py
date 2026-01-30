@@ -34,15 +34,15 @@ logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
 
 if probe_data.get('umj_url_init'):
     try:
-        payload = {'usr': probe_data['assigned_user']}
-        headers = {'X-UMJ-WFLW-API-KEY': probe_data['umj_api_key']}
+        payload = {'usr': probe_data.get('assigned_user')}
+        headers = {'X-UMJ-WFLW-API-KEY': probe_data.get('umj_api_key')}
  
-        r = requests.get(probe_data['umj_url_init'], params=payload, headers=headers)
+        r = requests.get(probe_data.get('umj_url_init'), params=payload, headers=headers)
         if r.status_code == 200:
             umj_jwt_token = r.cookies['access_token']
 
-            ws_url = f"wss://{probe_data['umj_url']}/ws?prb=y&prb_id={probe_data['prb_id']}&unm={probe_data['assigned_user']}"
-            core_client = CoreClient(umj_url=probe_data['umj_url_init'], umj_ws_url=ws_url, umj_token=umj_jwt_token)
+            ws_url = f"wss://{probe_data.get('umj_url')}/ws?prb=y&prb_id={probe_data.get('prb_id')}&unm={probe_data.get('assigned_user')}"
+            core_client = CoreClient(umj_url=probe_data.get('umj_url_init'), umj_ws_url=ws_url, umj_token=umj_jwt_token)
 
             t = threading.Thread(target=core_client.run, daemon=True)
             t.start()
