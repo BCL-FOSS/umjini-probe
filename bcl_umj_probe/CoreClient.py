@@ -59,9 +59,9 @@ class CoreClient:
         await self.prb_db.connect_db()
         probe_data = await self.prb_db.get_all_data(match='prb-*')
         probe_data_dict = next(iter(probe_data.values()))
+        run_conn = True
 
-        while True:
-            
+        while run_conn is True:
             headers = {
                 "Cookie": f"access_token={access_token}"
             }
@@ -75,10 +75,10 @@ class CoreClient:
                     backoff = 1  # reset backoff on success
                     await self.interact(ws, probe_obj=probe_data_dict)
 
-            except (ConnectionClosed, Exception) as e:
+            except (Exception) as e:
                 if retry_counter == 3:
-                    retry_counter = 0
-                    return
+                    run_conn = False
+                    
                 self.logger.error(f"WebSocket error: {e}")
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 60)
@@ -91,13 +91,17 @@ class CoreClient:
 
                 if umj_response.status_code != 200:
                     self.logger.error("Failed to refresh access_token")
-                    return
+                    run_conn = False
 
                 access_token = umj_response.cookies.get("access_token")
                 if not access_token:
                     self.logger.error("No access_token returned")
-                    return
+                    run_conn = False
                 retry_counter+=1
+
+            except (ConnectionClosed) as e_closed:
+                self.logger.error(e_closed)
+                run_conn = False
 
     async def interact(self, ws: ClientConnection, probe_obj: dict):
         async def receive():
