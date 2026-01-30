@@ -158,4 +158,4 @@ class CoreClient:
         await asyncio.gather(receive(), heartbeat())
 
     def run(self):
-        asyncio.run(self.connect_with_backoff(ws_url=self.umj_ws, init_url=self.umj_url, cookie=self.umj_token))
+        asyncio.run(self.connect_with_backoff(ws_url=self.umj_ws, access_token=self.umj_token, init_url=self.umj_url))
