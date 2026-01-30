@@ -124,7 +124,7 @@ class CoreClient:
                         logger.info("Interaction cancelled")
                         raise
                     except ConnectionClosed as cc:
-                        logger.warning("Websocket closed: %s", cc)
+                        logger.warning(f"Websocket closed: {cc}")
                     except Exception:
                         logger.exception("Error during interaction")
 
@@ -134,7 +134,7 @@ class CoreClient:
                         break
 
                     # Otherwise the socket closed unexpectedly; attempt reconnect with a short pause
-                    logger.info("Socket closed, will attempt reconnect (backoff=%s)", backoff)
+                    logger.info(f"Socket closed, will attempt reconnect (backoff={backoff})")
                     # small delay to avoid tight reconnect loop
                     try:
                         await asyncio.wait_for(stop_event.wait(), timeout=0.5)
@@ -143,12 +143,12 @@ class CoreClient:
                         pass
 
             except (InvalidHandshake, OSError) as e:
-                logger.error("WebSocket connection error (handshake/OSError): %s", e)
+                logger.error(f"WebSocket connection error (handshake/OSError): {e}")
             except asyncio.CancelledError:
                 logger.info("connect_with_backoff cancelled")
                 break
             except Exception as e:
-                logger.exception("Unexpected error connecting websocket: %s", e)
+                logger.exception(f"Unexpected error connecting websocket: {e}")
 
             # Attempt to refresh token via init_url before reconnecting (if possible)
             try:
@@ -156,7 +156,7 @@ class CoreClient:
                 if init_url and umj_api_key:
                     umj_response = await self.make_request(url=init_url, umj_key=umj_api_key)
                     if umj_response.status_code != 200:
-                        logger.error("Failed to refresh access_token (init returned %s). Stopping reconnect attempts.", umj_response.status_code)
+                        logger.error(f"Failed to refresh access_token (init returned {umj_response.status_code}). Stopping reconnect attempts.")
                         break
                     new_token = umj_response.cookies.get("access_token")
                     if not new_token:
@@ -166,12 +166,12 @@ class CoreClient:
                 else:
                     logger.debug("No init_url or api_key provided; skipping token refresh")
             except Exception as e:
-                logger.warning("Error refreshing access token: %s", e)
+                logger.warning(f"Error refreshing access token: {e}")
 
             # Exponential backoff with jitter (but watch stop_event)
             jitter = random.uniform(0, min(3.0, backoff))
             sleep_for = min(backoff + jitter, max_backoff)
-            logger.info("Waiting %.2fs before reconnect (backoff=%.1f, jitter=%.2f)", sleep_for, backoff, jitter)
+            logger.info(f"Waiting {sleep_for:.2f}s before reconnect (backoff={backoff:.1f}, jitter={jitter:.2f})")
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=sleep_for)
                 # stop_event set -> exit
@@ -200,20 +200,20 @@ class CoreClient:
                 try:
                     raw_message = await ws.recv()
                 except ConnectionClosed as cc:
-                    logger.warning("Receive: connection closed: %s", cc)
+                    logger.warning(f"Receive: connection closed: {cc}")
                     break
                 except asyncio.CancelledError:
                     logger.debug("Receive task cancelled")
                     break
                 except Exception as e:
-                    logger.exception("Receive: unexpected error: %s", e)
+                    logger.exception(f"Receive: unexpected error: {e}")
                     break
 
                 # Safely parse JSON if possible
                 try:
                     core_act_data = json.loads(raw_message)
                 except Exception:
-                    logger.debug("Received non-JSON message: %s", raw_message)
+                    logger.debug(f"Received non-JSON message: {raw_message}")
                     continue
 
                 if core_act_data.get('remote_act') == 'prb_analysis':
@@ -238,7 +238,7 @@ class CoreClient:
                                     # run sync handler in default loop safely if it may block?
                                     result = handler(**(params or {}))
                             except Exception:
-                                logger.exception("Handler for action %s raised", action)
+                                logger.exception(f"Handler for action {action} raised")
 
                         # Build and serialize result before sending
                         umj_result_data = {
