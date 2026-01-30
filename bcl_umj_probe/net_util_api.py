@@ -32,7 +32,7 @@ prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE
 prb_id, hstnm, probe_data = init_probe()
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
 
-if probe_data['umj_url_init']:
+if probe_data.get('umj_url_init'):
     try:
         payload = {'usr': probe_data['assigned_user']}
         headers = {'X-UMJ-WFLW-API-KEY': probe_data['umj_api_key']}
