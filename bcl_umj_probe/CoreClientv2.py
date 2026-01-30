@@ -18,6 +18,7 @@ from websockets.exceptions import InvalidHandshake
 from typing import Optional
 import random
 import inspect as _inspect
+from utils.WebSocketClient import WebSocketClient
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
@@ -97,20 +98,8 @@ class CoreClient:
         self.logger.info("CoreClient: entering connect_with_backoff loop")
 
         while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
-            # Build a cookie header as a list of tuples for maximum compatibility
-            cookie_header = ("Cookie", f"access_token={access_token}")
-            header_seq = [cookie_header]
-            
-            _connect_sig = _inspect.signature(websockets.connect)
-            connect_kw = {"additional_headers": header_seq}
-
-            self.logger.debug(f"Connecting to websocket {ws_url} with headers: {header_seq} with parameters: {connect_kw}")
-
             try:
-                async with websockets.connect(
-                    uri=ws_url,
-                    **connect_kw
-                ) as ws:
+                async with WebSocketClient(ws_url, access_token=access_token) as ws:
                     self.logger.info(f"Connected to {ws_url}")
                     backoff = 1.0
 
