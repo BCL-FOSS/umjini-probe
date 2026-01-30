@@ -12,6 +12,7 @@ import logging
 import inspect
 from utils.RedisDB import RedisDB
 import httpx
+import json
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
@@ -54,11 +55,13 @@ class CoreClient:
 
     async def connect_with_backoff(self, ws_url: str, access_token: str, init_url: str):
         backoff = 1
+        retry_counter=0
         await self.prb_db.connect_db()
         probe_data = await self.prb_db.get_all_data(match='prb-*')
         probe_data_dict = next(iter(probe_data.values()))
 
         while True:
+            
             headers = {
                 "Cookie": f"access_token={access_token}"
             }
@@ -73,6 +76,9 @@ class CoreClient:
                     await self.interact(ws, probe_obj=probe_data_dict)
 
             except (ConnectionClosed, Exception) as e:
+                if retry_counter == 3:
+                    retry_counter = 0
+                    return
                 self.logger.error(f"WebSocket error: {e}")
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 60)
@@ -91,6 +97,7 @@ class CoreClient:
                 if not access_token:
                     self.logger.error("No access_token returned")
                     return
+                retry_counter+=1
 
     async def interact(self, ws: ClientConnection, probe_obj: dict):
         async def receive():
@@ -141,19 +148,8 @@ class CoreClient:
                     "site": probe_obj.get('site'), 
                     "act": "heart_beat"
                     }
-                await ws.send(ping)
+                await ws.send(json.dumps(ping))
                 await asyncio.sleep(30)
-
-        async def netmap():
-            while True:
-                await net_discovery.arp_scan()
-                ping = {
-                        "sess_id": probe_obj.get('prb_id'),
-                        "site": probe_obj.get('site'), 
-                        "act": "net_map"
-                        }
-                await ws.send(ping)
-                await asyncio.sleep(600)
 
         await asyncio.gather(receive(), heartbeat())
 
