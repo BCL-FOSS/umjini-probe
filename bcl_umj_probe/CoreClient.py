@@ -103,18 +103,18 @@ class CoreClient:
         async def receive():
             while True:
                 raw_message = await ws.recv()
-
-                if isinstance(raw_message, dict):
-                    if raw_message.get('remote_act') == 'prb_analysis':
-                        probe_id = raw_message.get('prb_id')
+                core_act_data = json.loads(raw_message)
+               
+                if core_act_data['remote_act'] == 'prb_analysis':
+                        probe_id = core_act_data['prb_id']
                         if probe_id and probe_id == probe_obj.get('prb_id'):
-                            action = raw_message.get("act")
-                            params = raw_message.get("prms")
+                            action = core_act_data["act"]
+                            params = core_act_data["prms"]
 
                             match action:
                                 case 'pcap_tux' | 'pcap_win':
-                                    pcap.set_host(host=raw_message.get('host'))
-                                    pcap.set_credentials(user=raw_message.get('usr'), password=raw_message.get('pwd'))
+                                    pcap.set_host(host=core_act_data['host'])
+                                    pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
                                     
                             # handle probe actions sent from umjiniti core
                             handler = action_map.get(action)
@@ -138,8 +138,7 @@ class CoreClient:
                             umj_result_data['act'] = "prb_act_rslt"
 
                             await ws.send(umj_result_data)
-                else:
-                    pass 
+       
                 
         async def heartbeat():
             while True:
