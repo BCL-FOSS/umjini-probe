@@ -82,7 +82,6 @@ class CoreClient:
         """
         backoff = 1.0
         max_backoff = 60.0
-        retry_counter = 0
 
         await self.prb_db.connect_db()
         probe_data = await self.prb_db.get_all_data(match='prb-*')
@@ -114,7 +113,6 @@ class CoreClient:
                 ) as ws:
                     self.logger.info(f"Connected to {ws_url}")
                     backoff = 1.0
-                    retry_counter = 0
 
                     # Run interaction until it returns (connection closed or stop requested).
                     try:
@@ -180,7 +178,6 @@ class CoreClient:
                 pass
 
             backoff = min(backoff * 2, max_backoff)
-            retry_counter += 1
 
         self.logger.info("CoreClient: exiting connect_with_backoff")
 
@@ -213,11 +210,11 @@ class CoreClient:
                     self.logger.debug(f"Received non-JSON message: {raw_message}")
                     continue
 
-                if core_act_data.get('remote_act') == 'prb_analysis':
-                    probe_id = core_act_data.get('prb_id')
+                if core_act_data['remote_act'] == 'prb_analysis':
+                    probe_id = core_act_data['prb_id']
                     if probe_id and probe_id == probe_obj.get('prb_id'):
-                        action = core_act_data.get("act")
-                        params = core_act_data.get("prms", {})
+                        action = core_act_data['act']
+                        params = core_act_data['prms']
 
                         # Some actions require setting credentials/host
                         match action:
@@ -225,17 +222,19 @@ class CoreClient:
                                 pcap.set_host(host=core_act_data.get('host'))
                                 pcap.set_credentials(user=core_act_data.get('usr'), password=core_act_data.get('pwd'))
 
+                        # handle probe actions sent from umjiniti core
                         handler = action_map.get(action)
-                        result = None
+                        if handler and params:
+                            if inspect.iscoroutinefunction(handler):
+                                result = await handler(**params)
+                            else:
+                                result = handler(**params)
+                            
                         if handler:
-                            try:
-                                if inspect.iscoroutinefunction(handler):
-                                    result = await handler(**(params or {}))
-                                else:
-                                    # run sync handler in default loop safely if it may block?
-                                    result = handler(**(params or {}))
-                            except Exception:
-                                self.logger.exception(f"Handler for action {action} raised")
+                            if inspect.iscoroutinefunction(handler):
+                                result = await handler()
+                            else:
+                                result = handler()
 
                         # Build and serialize result before sending
                         umj_result_data = {
@@ -245,10 +244,9 @@ class CoreClient:
                             'act_rslt_type': f'{action}',
                             'act': "prb_act_rslt"
                         }
-                        try:
-                            await ws.send(json.dumps(umj_result_data))
-                        except Exception:
-                            self.logger.exception("Failed to send result over websocket")
+                        
+                        await ws.send(json.dumps(umj_result_data))
+                     
 
         async def _heartbeat():
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
