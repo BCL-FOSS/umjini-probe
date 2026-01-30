@@ -17,6 +17,7 @@ from websockets import ConnectionClosed
 from websockets.exceptions import InvalidHandshake
 from typing import Optional
 import random
+import inspect as _inspect
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
@@ -96,16 +97,26 @@ class CoreClient:
         self.logger.info("CoreClient: entering connect_with_backoff loop")
 
         while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
-            headers = {
-                # websockets client supports extra_headers as list/sequence or mapping depending on version
-                # We'll supply a list of tuples for compatibility
-                "Cookie": f"access_token={access_token}"
-            }
+            # Build a cookie header as a list of tuples for maximum compatibility
+            cookie_header = ("Cookie", f"access_token={access_token}")
+            header_seq = [cookie_header]
+            
+            _connect_sig = _inspect.signature(websockets.connect)
+            match _connect_sig.parameters.keys():
+                case "extra_headers":
+                    connect_kw = {"extra_headers": header_seq}
+                case "additional_headers":
+                    connect_kw = {"additional_headers": header_seq}
+                case _:
+                    self.logger.error("websockets.connect has unexpected signature; cannot set headers")
+                    connect_kw = {"additional_headers": header_seq}
+
+            self.logger.debug(f"Connecting to websocket {ws_url} with headers: {header_seq} with parameters: {connect_kw}")
 
             try:
                 async with websockets.connect(
                     uri=ws_url,
-                    additional_headers=headers
+                    **connect_kw
                 ) as ws:
                     self.logger.info(f"Connected to {ws_url}")
                     backoff = 1.0
