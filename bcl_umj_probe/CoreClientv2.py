@@ -94,8 +94,7 @@ class CoreClient:
         self._stop_event = stop_event
         self._internal_stop = False
 
-        logger = getattr(self, "logger", logging.getLogger(__name__))
-        logger.info("CoreClient: entering connect_with_backoff loop")
+        self.logger.info("CoreClient: entering connect_with_backoff loop")
 
         while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
             headers = {
@@ -113,7 +112,7 @@ class CoreClient:
                     ping_interval=20,
                     ping_timeout=10,
                 ) as ws:
-                    logger.info("Connected to %s", ws_url)
+                    self.logger.info("Connected to %s", ws_url)
                     backoff = 1.0
                     retry_counter = 0
 
@@ -121,20 +120,20 @@ class CoreClient:
                     try:
                         await self.interact(ws, probe_obj=probe_data_dict, stop_event=stop_event)
                     except asyncio.CancelledError:
-                        logger.info("Interaction cancelled")
+                        self.logger.info("Interaction cancelled")
                         raise
                     except ConnectionClosed as cc:
-                        logger.warning(f"Websocket closed: {cc}")
+                        self.logger.warning(f"Websocket closed: {cc}")
                     except Exception:
-                        logger.exception("Error during interaction")
+                        self.logger.exception("Error during interaction")
 
                     # If stop requested, break the outer loop
                     if stop_event.is_set() or getattr(self, "_internal_stop", False):
-                        logger.info("Stop requested, exiting connect loop after clean disconnect")
+                        self.logger.info("Stop requested, exiting connect loop after clean disconnect")
                         break
 
                     # Otherwise the socket closed unexpectedly; attempt reconnect with a short pause
-                    logger.info(f"Socket closed, will attempt reconnect (backoff={backoff})")
+                    self.logger.info(f"Socket closed, will attempt reconnect (backoff={backoff})")
                     # small delay to avoid tight reconnect loop
                     try:
                         await asyncio.wait_for(stop_event.wait(), timeout=0.5)
@@ -143,12 +142,12 @@ class CoreClient:
                         pass
 
             except (InvalidHandshake, OSError) as e:
-                logger.error(f"WebSocket connection error (handshake/OSError): {e}")
+                self.logger.error(f"WebSocket connection error (handshake/OSError): {e}")
             except asyncio.CancelledError:
-                logger.info("connect_with_backoff cancelled")
+                self.logger.info("connect_with_backoff cancelled")
                 break
             except Exception as e:
-                logger.exception(f"Unexpected error connecting websocket: {e}")
+                self.logger.exception(f"Unexpected error connecting websocket: {e}")
 
             # Attempt to refresh token via init_url before reconnecting (if possible)
             try:
@@ -156,22 +155,22 @@ class CoreClient:
                 if init_url and umj_api_key:
                     umj_response = await self.make_request(url=init_url, umj_key=umj_api_key)
                     if umj_response.status_code != 200:
-                        logger.error(f"Failed to refresh access_token (init returned {umj_response.status_code}). Stopping reconnect attempts.")
+                        self.logger.error(f"Failed to refresh access_token (init returned {umj_response.status_code}). Stopping reconnect attempts.")
                         break
                     new_token = umj_response.cookies.get("access_token")
                     if not new_token:
-                        logger.error("No access_token returned when refreshing token. Stopping reconnect attempts.")
+                        self.logger.error("No access_token returned when refreshing token. Stopping reconnect attempts.")
                         break
                     access_token = new_token
                 else:
-                    logger.debug("No init_url or api_key provided; skipping token refresh")
+                    self.logger.debug("No init_url or api_key provided; skipping token refresh")
             except Exception as e:
-                logger.warning(f"Error refreshing access token: {e}")
+                self.logger.warning(f"Error refreshing access token: {e}")
 
             # Exponential backoff with jitter (but watch stop_event)
             jitter = random.uniform(0, min(3.0, backoff))
             sleep_for = min(backoff + jitter, max_backoff)
-            logger.info(f"Waiting {sleep_for:.2f}s before reconnect (backoff={backoff:.1f}, jitter={jitter:.2f})")
+            self.logger.info(f"Waiting {sleep_for:.2f}s before reconnect (backoff={backoff:.1f}, jitter={jitter:.2f})")
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=sleep_for)
                 # stop_event set -> exit
@@ -183,7 +182,7 @@ class CoreClient:
             backoff = min(backoff * 2, max_backoff)
             retry_counter += 1
 
-        logger.info("CoreClient: exiting connect_with_backoff")
+        self.logger.info("CoreClient: exiting connect_with_backoff")
 
     async def interact(self, ws: ClientConnection, probe_obj: dict, stop_event: Optional[asyncio.Event] = None):
         """
@@ -193,27 +192,25 @@ class CoreClient:
         if stop_event is None:
             stop_event = asyncio.Event()
 
-        logger = getattr(self, "logger", logging.getLogger(__name__))
-
         async def _receive():
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
                 try:
                     raw_message = await ws.recv()
                 except ConnectionClosed as cc:
-                    logger.warning(f"Receive: connection closed: {cc}")
+                    self.logger.warning(f"Receive: connection closed: {cc}")
                     break
                 except asyncio.CancelledError:
-                    logger.debug("Receive task cancelled")
+                    self.logger.debug("Receive task cancelled")
                     break
                 except Exception as e:
-                    logger.exception(f"Receive: unexpected error: {e}")
+                    self.logger.exception(f"Receive: unexpected error: {e}")
                     break
 
                 # Safely parse JSON if possible
                 try:
                     core_act_data = json.loads(raw_message)
                 except Exception:
-                    logger.debug(f"Received non-JSON message: {raw_message}")
+                    self.logger.debug(f"Received non-JSON message: {raw_message}")
                     continue
 
                 if core_act_data.get('remote_act') == 'prb_analysis':
@@ -238,7 +235,7 @@ class CoreClient:
                                     # run sync handler in default loop safely if it may block?
                                     result = handler(**(params or {}))
                             except Exception:
-                                logger.exception(f"Handler for action {action} raised")
+                                self.logger.exception(f"Handler for action {action} raised")
 
                         # Build and serialize result before sending
                         umj_result_data = {
@@ -251,7 +248,7 @@ class CoreClient:
                         try:
                             await ws.send(json.dumps(umj_result_data))
                         except Exception:
-                            logger.exception("Failed to send result over websocket")
+                            self.logger.exception("Failed to send result over websocket")
 
         async def _heartbeat():
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
@@ -263,12 +260,12 @@ class CoreClient:
                 try:
                     await ws.send(json.dumps(ping))
                 except ConnectionClosed:
-                    logger.warning("Heartbeat: connection closed")
+                    self.logger.warning("Heartbeat: connection closed")
                     break
                 except asyncio.CancelledError:
                     break
                 except Exception:
-                    logger.exception("Heartbeat: failed to send ping")
+                    self.logger.exception("Heartbeat: failed to send ping")
                     break
                 # Heartbeat interval 30s
                 try:
@@ -292,7 +289,7 @@ class CoreClient:
             except Exception:
                 pass
 
-        logger.debug("Interact finished (receive/heartbeat)")
+        self.logger.debug("Interact finished (receive/heartbeat)")
 
     async def run(self, stop_event: Optional[asyncio.Event] = None):
         """
