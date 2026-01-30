@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi_user_limiter.limiter import rate_limiter
 from pydantic import BaseModel
@@ -11,8 +12,10 @@ from net_util_mcp import mcp
 import os
 from utils.RedisDB import RedisDB
 import threading
-from CoreClient import CoreClient
+#from CoreClient import CoreClient
+from CoreClientv2 import CoreClient
 import requests
+import asyncio
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -32,26 +35,77 @@ prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE
 prb_id, hstnm, probe_data = init_probe()
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
 
-if probe_data.get('umj_url_init'):
-    try:
-        payload = {'usr': probe_data.get('assigned_user')}
-        headers = {'X-UMJ-WFLW-API-KEY': probe_data.get('umj_api_key')}
- 
-        r = requests.get(probe_data.get('umj_url_init'), params=payload, headers=headers)
-        if r.status_code == 200:
-            umj_jwt_token = r.cookies['access_token']
-
-            ws_url = f"wss://{probe_data.get('umj_url')}/ws?prb=y&prb_id={probe_data.get('prb_id')}&unm={probe_data.get('assigned_user')}"
-            core_client = CoreClient(umj_url=probe_data.get('umj_url_init'), umj_ws_url=ws_url, umj_token=umj_jwt_token)
-
-            t = threading.Thread(target=core_client.run, daemon=True)
-            t.start()
-            logger.info("Started core socket")
-    except Exception as e:
-        logger.exception("Failed to start core socket.")
-
 mcp_app = mcp.http_app(path="/mcp")
-api = FastAPI(title='Network Util API', lifespan=mcp_app.lifespan)
+
+@asynccontextmanager
+async def combined_lifespan(app:FastAPI):
+    async with mcp_app.lifespan(app):
+        # --- STARTUP logic (runs once on app start) ---
+        # idempotent guard
+        if getattr(app.state, "core_client_started", False) is False:
+            app.state.core_client_started = True
+            app.state.core_client = None
+            app.state.core_client_task = None
+            app.state.core_client_stop = None
+
+            # Only try to start if probe_data has an init URL
+            if probe_data.get("umj_url_init"):
+                try:
+                    # Call the init endpoint to get a JWT cookie (use async httpx)
+                    params = {"usr": probe_data.get("assigned_user")}
+                    headers = {"X-UMJ-WFLW-API-KEY": probe_data.get("umj_api_key")}
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        resp = await client.get(probe_data.get("umj_url_init"), params=params, headers=headers)
+
+                    if resp.status_code == 200:
+                        umj_jwt_token = resp.cookies.get("access_token")
+                        if umj_jwt_token:
+                            # Build websocket url exactly how server expects it
+                            ws_url = f"wss://{probe_data.get('umj_url')}/ws?prb=y&prb_id={probe_data.get('prb_id')}&unm={probe_data.get('assigned_user')}"
+
+                            # Create CoreClient instance (expects run(stop_event) as async)
+                            core_client = CoreClient(umj_url=probe_data.get("umj_url_init"),
+                                                     umj_ws_url=ws_url,
+                                                     umj_token=umj_jwt_token)
+
+                            # create stop event and start async task
+                            stop_event = asyncio.Event()
+                            app.state.core_client_stop = stop_event
+                            app.state.core_client = core_client
+                            app.state.core_client_task = asyncio.create_task(core_client.run(stop_event))
+                            logger.info("Started CoreClient task in FastAPI lifespan")
+                        else:
+                            logger.warning("Init returned no access_token cookie; skipping CoreClient startup")
+                    else:
+                        logger.warning("Init request returned status %s; skipping CoreClient startup", resp.status_code)
+                except Exception as e:
+                    logger.exception("Failed to start CoreClient during startup: %s", e)
+            else:
+                logger.info("No umj_url_init configured; not starting CoreClient")
+        
+        yield
+        
+        # signal stop and await task termination
+        stop_event = getattr(app.state, "core_client_stop", None)
+        task = getattr(app.state, "core_client_task", None)
+
+        if stop_event is not None:
+            stop_event.set()
+
+        if task is not None:
+            try:
+                await asyncio.wait_for(task, timeout=10.0)
+            except asyncio.TimeoutError:
+                logger.warning("CoreClient task did not exit in time; cancelling")
+                task.cancel()
+                try:
+                    await task
+                except Exception:
+                    pass
+
+            logger.info("CoreClient stopped and combined_lifespan exiting")
+
+api = FastAPI(title='Network Util API', lifespan=combined_lifespan)
 
 async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: dict = {}, cookies: str = ''):
     async with httpx.AsyncClient() as client:
