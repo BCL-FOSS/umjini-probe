@@ -1,4 +1,4 @@
-from base.Network import Network
+from utils.network_utils.base.Network import Network
 from datetime import datetime, timezone
 import asyncio
 from pathlib import Path

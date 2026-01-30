@@ -1,4 +1,4 @@
-from base.Network import Network
+from utils.network_utils.base.Network import Network
 
 class NetworkDiscovery(Network):
     def __init__(self):
