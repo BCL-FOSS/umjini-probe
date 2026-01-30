@@ -6,7 +6,7 @@ services:
       dockerfile: bcl_umj_probe/Dockerfile
     container_name: umjprobe
     environment:
-      - PROBE_DB=probedb
+      - PROBE_DB=127.0.0.1
       - PROBE_DB_PORT=6369
     network_mode: "host"
     cap_add:
@@ -21,29 +21,18 @@ services:
     image: redis:latest
     container_name: probedb
     command: ["redis-server", "--port", "6369", "--appendonly", "yes"]
+    network_mode: "host"
     volumes:
       - probe_db_data:/data 
-
-  caddy:
-    image: caddy:latest
-    container_name: caddy
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - umj_probe
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6369", "PING"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
 
 volumes:
   probe_app_data:
     external: true
   probe_db_data:
-    external: true
-  caddy_data:
-    external: true
-  caddy_config:
     external: true

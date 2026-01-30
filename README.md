@@ -3,9 +3,6 @@ Open source tool to turn your favorite LLM into a bonafide network administrator
 
 ### Initial Configuration
 ```bash
-# Assign A record for probe
-
-# Change url in Caddyfile to url assigned to A record
 
 # If running on Ubuntu host with 2GB of RAM or less, run the following command
 $ sudo sysctl vm.overcommit_memory=1

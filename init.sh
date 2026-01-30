@@ -26,10 +26,11 @@ firewallconfig() {
   #iptables -t mangle -F
   #iptables -t mangle -X
 
-  echo "Allowing traffic on ports 22 (SSH), 80 (HTTP), 443 (HTTPS), 7969 and 7968 (iperf server & client)..."
+  echo "Allowing traffic on ports 22 (SSH), 8000 (umjiniti probe client), 7969 and 7968 (network performance testing ports)..."
   iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-  iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-  iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+  #iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+  #iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+  iptables -A INPUT -p tcp --dport 8000 -j ACCEPT
   iptables -A INPUT -p tcp --dport 7969 -j ACCEPT
   iptables -A INPUT -p tcp --dport 7968 -j ACCEPT
   
@@ -83,8 +84,8 @@ dockersetup() {
 
   sudo docker volume create --name=probe_app_data
   sudo docker volume create --name=probe_db_data
-  sudo docker volume create --name=caddy_data
-  sudo docker volume create --name=caddy_config
+  #sudo docker volume create --name=caddy_data
+  #sudo docker volume create --name=caddy_config
   sudo docker-compose up
  
 }
