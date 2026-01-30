@@ -102,14 +102,7 @@ class CoreClient:
             header_seq = [cookie_header]
             
             _connect_sig = _inspect.signature(websockets.connect)
-            match _connect_sig.parameters.keys():
-                case "extra_headers":
-                    connect_kw = {"extra_headers": header_seq}
-                case "additional_headers":
-                    connect_kw = {"additional_headers": header_seq}
-                case _:
-                    self.logger.error("websockets.connect has unexpected signature; cannot set headers")
-                    connect_kw = {"additional_headers": header_seq}
+            connect_kw = {"additional_headers": header_seq}
 
             self.logger.debug(f"Connecting to websocket {ws_url} with headers: {header_seq} with parameters: {connect_kw}")
 
