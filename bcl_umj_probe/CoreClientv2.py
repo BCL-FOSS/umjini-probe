@@ -1,4 +1,5 @@
 import asyncio
+from urllib.parse import urlparse
 import websockets
 import os
 from websockets import ClientConnection, ConnectionClosed
@@ -19,6 +20,9 @@ from typing import Optional
 import random
 import inspect as _inspect
 from utils.WebSocketClient import WebSocketClient
+from websockets.asyncio.client import connect
+from urllib.parse import urlparse
+
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
@@ -97,76 +101,72 @@ class CoreClient:
 
         self.logger.info("CoreClient: entering connect_with_backoff loop")
 
-        while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
-            try:
-                async with WebSocketClient(ws_url, access_token=access_token) as ws:
-                    self.logger.info(f"Connected to {ws_url}")
-                    backoff = 1.0
+        headers = {
+                "Cookie": f"access_token={access_token}",
+            }
 
-                    # Run interaction until it returns (connection closed or stop requested).
-                    try:
-                        await self.interact(ws, probe_obj=probe_data_dict, stop_event=stop_event)
-                    except asyncio.CancelledError:
-                        self.logger.info("Interaction cancelled")
-                        raise
-                    except ConnectionClosed as cc:
-                        self.logger.warning(f"Websocket closed: {cc}")
-                    except Exception:
-                        self.logger.exception("Error during interaction")
+        async with connect(uri=ws_url, additional_headers=headers) as websocket:
+            self.logger.info(f"Connected to {ws_url}")
+            backoff = 1.0
 
+            while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
+                try:
                     # If stop requested, break the outer loop
                     if stop_event.is_set() or getattr(self, "_internal_stop", False):
                         self.logger.info("Stop requested, exiting connect loop after clean disconnect")
                         break
 
-                    # Otherwise the socket closed unexpectedly; attempt reconnect with a short pause
-                    self.logger.info(f"Socket closed, will attempt reconnect (backoff={backoff})")
-                    # small delay to avoid tight reconnect loop
+                    # Run interaction until it returns (connection closed or stop requested).
+                    await self.interact(websocket, probe_obj=probe_data_dict, stop_event=stop_event)
+                
+                    await asyncio.wait_for(stop_event.wait(), timeout=0.5)
+
+                except websockets.exceptions.ConnectionClosed as e:
+                    self.logger.error(f"WebSocket connection closed: {e}")
+                except websockets.exceptions.InvalidHandshake as ih:
+                    self.logger.error(f"WebSocket invalid handshake: {ih}")
+                except websockets.exceptions.WebSocketException as we:
+                    self.logger.error(f"WebSocket exception: {we}")
+
+                    """
+                    umj_api_key = probe_data_dict.get('umj_api_key')
+                    if init_url and umj_api_key:
+                        umj_response = await self.make_request(url=init_url, umj_key=umj_api_key)
+                        if umj_response.status_code != 200:
+                            self.logger.error(f"Failed to refresh access_token (init returned {umj_response.status_code}). Stopping reconnect attempts.")
+                            break
+                        new_token = umj_response.cookies.get("access_token")
+                        if not new_token:
+                            self.logger.error("No access_token returned when refreshing token. Stopping reconnect attempts.")
+                            break
+                        access_token = new_token
+                    else:
+                        self.logger.debug("No init_url or api_key provided; skipping token refresh")
+
+                    # Exponential backoff with jitter (but watch stop_event)
+                    jitter = random.uniform(0, min(3.0, backoff))
+                    sleep_for = min(backoff + jitter, max_backoff)
+                    self.logger.info(f"Waiting {sleep_for:.2f}s before reconnect (backoff={backoff:.1f}, jitter={jitter:.2f})")
                     try:
-                        await asyncio.wait_for(stop_event.wait(), timeout=0.5)
+                        await asyncio.wait_for(stop_event.wait(), timeout=sleep_for)
+                        # stop_event set -> exit
                         break
                     except asyncio.TimeoutError:
+                        # timed out, continue reconnect attempts
                         pass
 
-            except (InvalidHandshake, OSError) as e:
-                self.logger.error(f"WebSocket connection error (handshake/OSError): {e}")
-            except asyncio.CancelledError:
-                self.logger.info("connect_with_backoff cancelled")
-                break
-            except Exception as e:
-                self.logger.exception(f"Unexpected error connecting websocket: {e}")
+                    backoff = min(backoff * 2, max_backoff)
 
-            # Attempt to refresh token via init_url before reconnecting (if possible)
-            try:
-                umj_api_key = probe_data_dict.get('umj_api_key')
-                if init_url and umj_api_key:
-                    umj_response = await self.make_request(url=init_url, umj_key=umj_api_key)
-                    if umj_response.status_code != 200:
-                        self.logger.error(f"Failed to refresh access_token (init returned {umj_response.status_code}). Stopping reconnect attempts.")
-                        break
-                    new_token = umj_response.cookies.get("access_token")
-                    if not new_token:
-                        self.logger.error("No access_token returned when refreshing token. Stopping reconnect attempts.")
-                        break
-                    access_token = new_token
-                else:
-                    self.logger.debug("No init_url or api_key provided; skipping token refresh")
-            except Exception as e:
-                self.logger.warning(f"Error refreshing access token: {e}")
+                    continue
+                    
+                    """
 
-            # Exponential backoff with jitter (but watch stop_event)
-            jitter = random.uniform(0, min(3.0, backoff))
-            sleep_for = min(backoff + jitter, max_backoff)
-            self.logger.info(f"Waiting {sleep_for:.2f}s before reconnect (backoff={backoff:.1f}, jitter={jitter:.2f})")
-            try:
-                await asyncio.wait_for(stop_event.wait(), timeout=sleep_for)
-                # stop_event set -> exit
-                break
-            except asyncio.TimeoutError:
-                # timed out, continue reconnect attempts
-                pass
+                    
 
-            backoff = min(backoff * 2, max_backoff)
+                except asyncio.CancelledError:
+                    self.logger.info("connect_with_backoff cancelled")
+                except Exception as e:
+                    self.logger.exception(f"Unexpected error connecting websocket: {e}")
 
         self.logger.info("CoreClient: exiting connect_with_backoff")
 
@@ -182,7 +182,7 @@ class CoreClient:
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
                 try:
                     raw_message = await ws.recv()
-                except ConnectionClosed as cc:
+                except websockets.exceptions.ConnectionClosed as cc:
                     self.logger.warning(f"Receive: connection closed: {cc}")
                     break
                 except asyncio.CancelledError:

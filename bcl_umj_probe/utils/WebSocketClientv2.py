@@ -34,7 +34,7 @@ class WebSocketClient:
         }
 
         # Build a proper ClientWSTimeout to avoid the deprecated float usage.
-        ws_timeout = ClientWSTimeout(total=self.timeout) if self.timeout is not None else None
+        ws_timeout = ClientWSTimeout() if self.timeout is not None else None
 
         try:
             # Pass the headers and a ClientWSTimeout instance (if provided)

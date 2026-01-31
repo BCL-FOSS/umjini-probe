@@ -1,6 +1,9 @@
 import asyncio
 import aiohttp
 from urllib.parse import urlparse
+import websocket
+from websocket import create_connection
+
 
 class WebSocketClient:
     def __init__(self, url: str, access_token: str, *, timeout: int = 10):
