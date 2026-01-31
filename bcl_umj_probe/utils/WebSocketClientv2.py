@@ -1,7 +1,6 @@
-import asyncio
 import logging
 import aiohttp
-from aiohttp import WSMsgType, ClientWSServerHandshakeError, ClientWSTimeout
+from aiohttp import WSMsgType, ClientWSTimeout, WSServerHandshakeError
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
