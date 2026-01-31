@@ -18,7 +18,7 @@ from websockets.exceptions import InvalidHandshake
 from typing import Optional
 import random
 import inspect as _inspect
-from utils.WebSocketClient import WebSocketClient
+from utils.WebSocketClientv2 import WebSocketClient
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
