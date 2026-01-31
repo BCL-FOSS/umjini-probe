@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+from urllib.parse import urlparse
 
 class WebSocketClient:
     def __init__(self, url: str, access_token: str, *, timeout: int = 10):
@@ -12,8 +13,14 @@ class WebSocketClient:
     async def __aenter__(self):
         # Create a session and set the Cookie header explicitly on the websocket handshake.
         self.session = aiohttp.ClientSession()
+        parsed = urlparse(self.url)
+        origin = f"{'https' if parsed.scheme == 'wss' else 'http'}://{parsed.netloc}"
+
         headers = {
-            "Cookie": f"access_token={self.access_token}"
+            "Cookie": f"access_token={self.access_token}",
+            "Origin": origin,
+            # Add a User-Agent to be polite and closer to a browser handshake
+            "User-Agent": "umj-probe/1.0 (+https://example.org)"
         }
 
         try:
