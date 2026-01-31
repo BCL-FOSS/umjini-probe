@@ -16,6 +16,12 @@ import threading
 from CoreClientv2 import CoreClient
 import requests
 import asyncio
+from websockets import ClientConnection, ConnectionClosed
+from typing import Callable
+from utils.network_utils.NetworkDiscovery import NetworkDiscovery
+from utils.network_utils.NetworkTest import NetworkTest
+from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.network_utils.PacketCapture import PacketCapture
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -34,6 +40,30 @@ prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE
 
 prb_id, hstnm, probe_data = init_probe()
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
+
+net_discovery = NetworkDiscovery()
+net_test = NetworkTest()
+pcap = PacketCapture()
+probe_util = ProbeInfo()
+
+net_discovery.set_interface(probe_util.get_ifaces()[0])
+
+action_map: dict[str, Callable[[dict], object]] = {
+    "trcrt_dns": net_test.dnstraceroute,
+    "trcrt": net_test.traceroute,
+    "test_srvr": net_test.iperf_server,
+    "test_clnt": net_test.iperf_client,
+    "arp": net_discovery.arp_scan,
+    "dev_classify": net_discovery.custom_scan,
+    "dev_id": net_discovery.device_identification_scan,
+    "dev_fngr": net_discovery.device_fingerprint_scan,
+    "net_scan": net_discovery.full_network_scan,
+    "snmp_scans": net_discovery.snmp_scans,
+    "service_id": net_discovery.port_scan,
+    "pcap_lcl": pcap.pcap_local,
+    "pcap_tux": pcap.pcap_remote_linux,
+    "pcap_win": pcap.pcap_remote_windows
+}
 
 mcp_app = mcp.http_app(path="/mcp")
 
@@ -177,3 +207,7 @@ async def init(init_data: InitCall):
             return 200
         else:
             return {"Error": "occurred during probe adoption"}, 400
+        
+@api.post("/v1/api/exec", dependencies=[Depends(validate_api_key)])
+async def exec():
+    return {"status": "ok"}
