@@ -19,3 +19,4 @@ aiofiles
 onetimesecret
 httpx
 websocket-client
+python-crontab

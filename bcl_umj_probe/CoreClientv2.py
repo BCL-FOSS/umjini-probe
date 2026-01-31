@@ -1,5 +1,4 @@
 import asyncio
-from urllib.parse import urlparse
 import websockets
 import os
 from websockets import ClientConnection, ConnectionClosed
@@ -12,17 +11,10 @@ import os
 import logging
 import inspect
 from utils.RedisDB import RedisDB
-import httpx
 import json
 from websockets import ConnectionClosed
-from websockets.exceptions import InvalidHandshake
 from typing import Optional
-import random
-import inspect as _inspect
-from utils.WebSocketClient import WebSocketClient
 from websockets.asyncio.client import connect
-from urllib.parse import urlparse
-
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
@@ -49,19 +41,12 @@ action_map: dict[str, Callable[[dict], object]] = {
 }
 
 class CoreClient:
-    def __init__(self, umj_url: str, umj_token: str, umj_ws_url: str):
+    def __init__(self, umj_ws_url: str):
         logging.basicConfig(level=logging.DEBUG)
         logging.getLogger('passlib').setLevel(logging.ERROR)
         self.logger = logging.getLogger(__name__)
-        self.umj_url = umj_url
-        self.umj_token = umj_token
         self.umj_ws = umj_ws_url
         self.prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
-
-    async def make_request(self, url: str, umj_key: str = None):
-        async with httpx.AsyncClient() as client:
-            headers = {"X-UMJ-WFLW-API-KEY": umj_key}
-            return await client.get(url=url, headers=headers)
         
     def stop(self):
             """
@@ -78,17 +63,7 @@ class CoreClient:
             # Set internal flag
             self._internal_stop = True
 
-    async def connect_with_backoff(self, ws_url: str, access_token: str, init_url: str, stop_event: Optional[asyncio.Event] = None):
-        """
-        Persistent connection loop with exponential backoff + jitter that respects stop_event.
-        - ws_url: websocket URL
-        - access_token: cookie token to send
-        - init_url: URL to refresh token from (server init endpoint)
-        - stop_event: asyncio.Event used to request shutdown externally
-        """
-        backoff = 1.0
-        max_backoff = 60.0
-
+    async def connect_with_backoff(self, ws_url: str, stop_event: Optional[asyncio.Event] = None):
         await self.prb_db.connect_db()
         probe_data = await self.prb_db.get_all_data(match='prb-*')
         probe_data_dict = next(iter(probe_data.values()))
@@ -101,13 +76,8 @@ class CoreClient:
 
         self.logger.info("CoreClient: entering connect_with_backoff loop")
 
-        headers = {
-                "Cookie": f"access_token={access_token}",
-            }
-
-        async with connect(uri=ws_url, additional_headers=headers) as websocket:
+        async with connect(uri=ws_url) as websocket:
             self.logger.info(f"Connected to {ws_url}")
-            backoff = 1.0
 
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
                 try:
@@ -127,42 +97,6 @@ class CoreClient:
                     self.logger.error(f"WebSocket invalid handshake: {ih}")
                 except websockets.exceptions.WebSocketException as we:
                     self.logger.error(f"WebSocket exception: {we}")
-
-                    """
-                    umj_api_key = probe_data_dict.get('umj_api_key')
-                    if init_url and umj_api_key:
-                        umj_response = await self.make_request(url=init_url, umj_key=umj_api_key)
-                        if umj_response.status_code != 200:
-                            self.logger.error(f"Failed to refresh access_token (init returned {umj_response.status_code}). Stopping reconnect attempts.")
-                            break
-                        new_token = umj_response.cookies.get("access_token")
-                        if not new_token:
-                            self.logger.error("No access_token returned when refreshing token. Stopping reconnect attempts.")
-                            break
-                        access_token = new_token
-                    else:
-                        self.logger.debug("No init_url or api_key provided; skipping token refresh")
-
-                    # Exponential backoff with jitter (but watch stop_event)
-                    jitter = random.uniform(0, min(3.0, backoff))
-                    sleep_for = min(backoff + jitter, max_backoff)
-                    self.logger.info(f"Waiting {sleep_for:.2f}s before reconnect (backoff={backoff:.1f}, jitter={jitter:.2f})")
-                    try:
-                        await asyncio.wait_for(stop_event.wait(), timeout=sleep_for)
-                        # stop_event set -> exit
-                        break
-                    except asyncio.TimeoutError:
-                        # timed out, continue reconnect attempts
-                        pass
-
-                    backoff = min(backoff * 2, max_backoff)
-
-                    continue
-                    
-                    """
-
-                    
-
                 except asyncio.CancelledError:
                     self.logger.info("connect_with_backoff cancelled")
                 except Exception as e:
@@ -295,7 +229,7 @@ class CoreClient:
         self._internal_stop = False
 
         try:
-            await self.connect_with_backoff(ws_url=self.umj_ws, access_token=self.umj_token, init_url=self.umj_url, stop_event=stop_event)
+            await self.connect_with_backoff(ws_url=self.umj_ws, stop_event=stop_event)
         except asyncio.CancelledError:
             self.logger.info("CoreClient.run cancelled")
             raise
