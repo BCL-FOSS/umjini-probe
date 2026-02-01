@@ -128,36 +128,6 @@ class CoreClient:
 
                 probe_id = core_act_data['prb_id']
                 if probe_id and probe_id == probe_obj.get('prb_id'):
-                    action = core_act_data['act']
-                    params = core_act_data['prms']
-
-                    match action:
-                        case 'pcap_tux' | 'pcap_win':
-                            pcap.set_host(host=core_act_data['host'])
-                            pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
-
-                    handler = action_map.get(action)
-                    if handler and params:
-                        if inspect.iscoroutinefunction(handler):
-                            result = await handler(**params)
-                        else:
-                            result = handler(**params)
-                            
-                    if handler:
-                        if inspect.iscoroutinefunction(handler):
-                            result = await handler()
-                        else:
-                            result = handler()
-
-                        # Build and serialize result before sending
-                    umj_result_data = {
-                            'site': probe_obj.get('site'),
-                            'act_rslt': result,
-                            'prb_id': probe_obj.get('prb_id'),
-                            'act_rslt_type': f'{action}',
-                            'act': "prb_task_rslt"
-                        }
-                    
                     if core_act_data['auto'] == 'y':
                         ws_url = f"wss://{probe_obj.get('umj_url')}/heartbeat?prb_id={probe_obj.get('prb_id')}"
                         cron=CronTab()
@@ -189,9 +159,37 @@ class CoreClient:
                         """
 
                         await asyncio.to_thread(cron.write())
+                    else:
+                        action = core_act_data['act']
+                        params = core_act_data['prms']
 
-                    await ws.send(json.dumps(umj_result_data))
-                     
+                        match action:
+                            case 'pcap_tux' | 'pcap_win':
+                                pcap.set_host(host=core_act_data['host'])
+                                pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
+
+                        handler = action_map.get(action)
+                        if handler and params:
+                            if inspect.iscoroutinefunction(handler):
+                                result = await handler(**params)
+                            else:
+                                result = handler(**params)
+                                
+                        if handler:
+                            if inspect.iscoroutinefunction(handler):
+                                result = await handler()
+                            else:
+                                result = handler()
+
+                            # Build and serialize result before sending
+                        umj_result_data = {
+                                'site': probe_obj.get('site'),
+                                'act_rslt': result,
+                                'prb_id': probe_obj.get('prb_id'),
+                                'act_rslt_type': f'{action}',
+                                'act': "prb_task_rslt"
+                            }
+                        await ws.send(json.dumps(umj_result_data))
 
         async def _heartbeat():
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
