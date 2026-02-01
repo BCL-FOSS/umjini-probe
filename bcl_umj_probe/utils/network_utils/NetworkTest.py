@@ -8,7 +8,7 @@ class NetworkTest(Network):
     async def iperf_server(self, options: str = None, host: str = '0.0.0.0'):
         test_result_file = f'spdtst-server-result-{datetime.now(timezone.utc)}.json'
         pid_file = f'spdtst-server-pid-{datetime.now(timezone.utc)}.txt'
-        command = f'iperf3 -s -p 7969 --logfile {test_result_file} --bind {host} - V -J --cport 7968 -D --pidfile {pid_file}'
+        command = f'iperf3 -s -p 7969 --logfile {test_result_file} --bind {host} - V -J --cport 7968 -D --pidfile {pid_file} '
 
         if options is not None:
             command += options
@@ -19,7 +19,7 @@ class NetworkTest(Network):
     
     async def iperf_client(self, server: str, options: str = None, host: str = '0.0.0.0'):
         test_result_file = f'spdtst-client-result-{datetime.now(timezone.utc)}.json'
-        command = f'iperf3 -c {server} -p 7969 --cport 7968 --bind {host} - V -J --logfile {test_result_file}'
+        command = f'iperf3 -c {server} -p 7969 --cport 7968 --bind {host} - V -J --logfile {test_result_file} '
 
         if options is not None:
             command += options

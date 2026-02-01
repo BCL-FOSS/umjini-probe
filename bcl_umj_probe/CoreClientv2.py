@@ -15,6 +15,8 @@ import json
 from websockets import ConnectionClosed
 from typing import Optional
 from websockets.asyncio.client import connect
+from crontab import CronTab
+import asyncio
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
@@ -28,13 +30,13 @@ action_map: dict[str, Callable[[dict], object]] = {
     "trcrt": net_test.traceroute,
     "test_srvr": net_test.iperf_server,
     "test_clnt": net_test.iperf_client,
-    "arp": net_discovery.arp_scan,
-    "dev_classify": net_discovery.custom_scan,
-    "dev_id": net_discovery.device_identification_scan,
-    "dev_fngr": net_discovery.device_fingerprint_scan,
-    "net_scan": net_discovery.full_network_scan,
-    "snmp_scans": net_discovery.snmp_scans,
-    "service_id": net_discovery.port_scan,
+    "scan_arp": net_discovery.arp_scan,
+    "scan_custom": net_discovery.custom_scan,
+    "scan_dev_id": net_discovery.device_identification_scan,
+    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
+    "scan_full": net_discovery.full_network_scan,
+    "scan_snmp": net_discovery.snmp_scans,
+    "scan_port": net_discovery.port_scan,
     "pcap_lcl": pcap.pcap_local,
     "pcap_tux": pcap.pcap_remote_linux,
     "pcap_win": pcap.pcap_remote_windows
@@ -49,11 +51,6 @@ class CoreClient:
         self.prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
         
     def stop(self):
-            """
-            Request the client to stop. If run() was started with a stop_event,
-            this will set that event. Also sets an internal stop flag so run()
-            knows to exit if called without an external event.
-            """
             # If external stop_event exists, set it
             if getattr(self, "_stop_event", None) is not None:
                 try:
@@ -105,10 +102,6 @@ class CoreClient:
         self.logger.info("CoreClient: exiting connect_with_backoff")
 
     async def interact(self, ws: ClientConnection, probe_obj: dict, stop_event: Optional[asyncio.Event] = None):
-        """
-        Run receive and heartbeat tasks concurrently until one finishes or stop_event is set.
-        Ensures tasks are cancelled and cleaned up properly.
-        """
         if stop_event is None:
             stop_event = asyncio.Event()
 
@@ -133,42 +126,71 @@ class CoreClient:
                     self.logger.debug(f"Received non-JSON message: {raw_message}")
                     continue
 
-                if core_act_data['remote_act'] == 'prb_analysis':
-                    probe_id = core_act_data['prb_id']
-                    if probe_id and probe_id == probe_obj.get('prb_id'):
-                        action = core_act_data['act']
-                        params = core_act_data['prms']
+                probe_id = core_act_data['prb_id']
+                if probe_id and probe_id == probe_obj.get('prb_id'):
+                    action = core_act_data['act']
+                    params = core_act_data['prms']
 
-                        # Some actions require setting credentials/host
-                        match action:
-                            case 'pcap_tux' | 'pcap_win':
-                                pcap.set_host(host=core_act_data.get('host'))
-                                pcap.set_credentials(user=core_act_data.get('usr'), password=core_act_data.get('pwd'))
+                    match action:
+                        case 'pcap_tux' | 'pcap_win':
+                            pcap.set_host(host=core_act_data['host'])
+                            pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
 
-                        # handle probe actions sent from umjiniti core
-                        handler = action_map.get(action)
-                        if handler and params:
-                            if inspect.iscoroutinefunction(handler):
-                                result = await handler(**params)
-                            else:
-                                result = handler(**params)
+                    handler = action_map.get(action)
+                    if handler and params:
+                        if inspect.iscoroutinefunction(handler):
+                            result = await handler(**params)
+                        else:
+                            result = handler(**params)
                             
-                        if handler:
-                            if inspect.iscoroutinefunction(handler):
-                                result = await handler()
-                            else:
-                                result = handler()
+                    if handler:
+                        if inspect.iscoroutinefunction(handler):
+                            result = await handler()
+                        else:
+                            result = handler()
 
                         # Build and serialize result before sending
-                        umj_result_data = {
+                    umj_result_data = {
                             'site': probe_obj.get('site'),
                             'act_rslt': result,
                             'prb_id': probe_obj.get('prb_id'),
                             'act_rslt_type': f'{action}',
-                            'act': "prb_act_rslt"
+                            'act': "prb_task_rslt"
                         }
-                        
-                        await ws.send(json.dumps(umj_result_data))
+                    
+                    if core_act_data['auto'] == 'y':
+                        ws_url = f"wss://{probe_obj.get('umj_url')}/heartbeat?prb_id={probe_obj.get('prb_id')}"
+                        cron=CronTab()
+                        cwd = os.getcwd()
+                        script_path = os.path.join(cwd, 'task_auto.py')
+                        job1=cron.new(command=f"python3 {script_path} -a {action} -p '{params}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')}", comment=f"auto_task_{probe_obj.get('prb_id')}_{action}")
+
+                        scheduled_months = set()
+                        scheduled_days = set()
+
+                        match core_act_data['auto_interval']:
+                            case 'hourly':
+                                job1.hour.every(int(core_act_data['auto_duration']))
+                            case 'daily':
+                                job1.day.every(int(core_act_data['auto_duration']))
+                            case 'monthly':
+                                job1.month.every(int(core_act_data['auto_duration']))
+                            case 'minute':
+                                job1.minute.every(int(core_act_data['auto_duration']))
+
+                        """
+                        job1.minute.during(5,50).every(5)
+                        job1.hour.every(4)
+                        job1.day.on(4, 5, 6)
+
+                        job1.dow.on('SUN')
+                        job1.dow.on('SUN', 'FRI')
+                        job1.month.during('APR', 'NOV')
+                        """
+
+                        await asyncio.to_thread(cron.write())
+
+                    await ws.send(json.dumps(umj_result_data))
                      
 
         async def _heartbeat():
@@ -213,14 +235,6 @@ class CoreClient:
         self.logger.debug("Interact finished (receive/heartbeat)")
 
     async def run(self, stop_event: Optional[asyncio.Event] = None):
-        """
-        Async entrypoint to start the persistent connection logic.
-        Accepts an optional asyncio.Event 'stop_event' which can be set externally to request a clean shutdown.
-        Example:
-            stop_event = asyncio.Event()
-            asyncio.create_task(core_client.run(stop_event))
-        """
-      
         self.logger.info("CoreClient.run starting")
         # store ref so external stop() can set it
         if stop_event is None:

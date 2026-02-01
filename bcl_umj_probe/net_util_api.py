@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Response
 from fastapi_user_limiter.limiter import rate_limiter
 from pydantic import BaseModel
 from init_app import (
@@ -13,11 +13,6 @@ import os
 from utils.RedisDB import RedisDB
 from CoreClientv2 import CoreClient
 import asyncio
-from typing import Callable
-from utils.network_utils.NetworkDiscovery import NetworkDiscovery
-from utils.network_utils.NetworkTest import NetworkTest
-from utils.network_utils.ProbeInfo import ProbeInfo
-from utils.network_utils.PacketCapture import PacketCapture
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -37,30 +32,6 @@ prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE
 prb_id, hstnm, probe_data = init_probe()
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
 
-net_discovery = NetworkDiscovery()
-net_test = NetworkTest()
-pcap = PacketCapture()
-probe_util = ProbeInfo()
-
-net_discovery.set_interface(probe_util.get_ifaces()[0])
-
-action_map: dict[str, Callable[[dict], object]] = {
-    "trcrt_dns": net_test.dnstraceroute,
-    "trcrt": net_test.traceroute,
-    "test_srvr": net_test.iperf_server,
-    "test_clnt": net_test.iperf_client,
-    "arp": net_discovery.arp_scan,
-    "dev_classify": net_discovery.custom_scan,
-    "dev_id": net_discovery.device_identification_scan,
-    "dev_fngr": net_discovery.device_fingerprint_scan,
-    "net_scan": net_discovery.full_network_scan,
-    "snmp_scans": net_discovery.snmp_scans,
-    "service_id": net_discovery.port_scan,
-    "pcap_lcl": pcap.pcap_local,
-    "pcap_tux": pcap.pcap_remote_linux,
-    "pcap_win": pcap.pcap_remote_windows
-}
-
 mcp_app = mcp.http_app(path="/mcp")
 
 @asynccontextmanager
@@ -75,9 +46,7 @@ async def combined_lifespan(app:FastAPI):
 
             if probe_data.get("umj_url"):
                 ws_url = f"wss://{probe_data.get('umj_url')}/heartbeat?prb_id={probe_data.get('prb_id')}"
-
                 core_client = CoreClient(umj_ws_url=ws_url)
-
                 stop_event = asyncio.Event()
                 app.state.core_client_stop = stop_event
                 app.state.core_client = core_client
@@ -117,7 +86,7 @@ async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: di
         
 @api.get("/v1/api/status", dependencies=[Depends(rate_limiter(2, 5))])
 def status():
-    return {"status": "ok"}
+    return Response(content='{"status": "ok"}', media_type="application/json", status_code=200)
 
 @api.post("/v1/api/init", dependencies=[Depends(validate_api_key)])
 async def init(init_data: InitCall):
@@ -160,7 +129,7 @@ async def init(init_data: InitCall):
     logger.info(probe_data)
 
     if await enrollment(payload=probe_data) != 200:
-        return {"Error": "occurred during probe adoption"}, 400
+        return Response(content='{"Error": "occurred during probe adoption"}', media_type="application/json", status_code=400)
     else:
         probe_info = await prb_db.get_all_data(match=f"prb-*")
         probe_info_dict = next(iter(probe_info.values()))
@@ -175,10 +144,6 @@ async def init(init_data: InitCall):
                           'umj_api_key': init_data.umj_api_key}
 
         if await prb_db.upload_db_data(id=probe_id, data=umj_probe_data) > 0:
-            return 200
+            return Response(content='{"status": "ok"}', media_type="application/json", status_code=200)
         else:
-            return {"Error": "occurred during probe adoption"}, 400
-        
-@api.post("/v1/api/exec", dependencies=[Depends(validate_api_key)])
-async def exec():
-    return {"status": "ok"}
+            return Response(content='{"Error": "occurred during probe adoption"}', media_type="application/json", status_code=400)
