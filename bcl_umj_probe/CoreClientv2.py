@@ -17,6 +17,7 @@ from typing import Optional
 from websockets.asyncio.client import connect
 from crontab import CronTab
 import asyncio
+import ast
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
@@ -107,68 +108,93 @@ class CoreClient:
 
         async def _receive():
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
-                try:
-                    raw_message = await ws.recv()
-                except websockets.exceptions.ConnectionClosed as cc:
-                    self.logger.warning(f"Receive: connection closed: {cc}")
-                    break
-                except asyncio.CancelledError:
-                    self.logger.debug("Receive task cancelled")
-                    break
-                except Exception as e:
-                    self.logger.exception(f"Receive: unexpected error: {e}")
-                    break
-
-                # Safely parse JSON if possible
-                try:
-                    core_act_data = json.loads(raw_message)
-                except Exception:
-                    self.logger.debug(f"Received non-JSON message: {raw_message}")
-                    continue
+                
+                raw_message = await ws.recv()
+                core_act_data = json.loads(raw_message)
+                self.logger.info(f"Received CoreClient message: {core_act_data}.")
 
                 probe_id = core_act_data['prb_id']
                 if probe_id and probe_id == probe_obj.get('prb_id'):
-                    if core_act_data['auto'] == 'y':
-                        ws_url = f"wss://{probe_obj.get('umj_url')}/heartbeat?prb_id={probe_obj.get('prb_id')}"
+                    prb_task_action = core_act_data['task']
+                    params = core_act_data['prms']
+
+                    if core_act_data['automate'] == 'y':
+                        ws_url = f"wss://{probe_obj.get('umj_url')}/heartbeat/{probe_obj.get('prb_id')}"
                         cron=CronTab()
                         cwd = os.getcwd()
                         script_path = os.path.join(cwd, 'task_auto.py')
-                        job1=cron.new(command=f"python3 {script_path} -a {action} -p '{params}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')}", comment=f"auto_task_{probe_obj.get('prb_id')}_{action}")
+                        job1=cron.new(command=f"python3 {script_path} -a {prb_task_action} -p '{params}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']}", comment=f"auto_task_{probe_obj.get('prb_id')}_{prb_task_action}")
 
-                        scheduled_months = set()
-                        scheduled_days = set()
+                        if 'minutes' in core_act_data and core_act_data['minutes']:
+                            minutes_range = ast.literal_eval(core_act_data['minutes'])
+                            if isinstance(minutes_range, list):
+                                if len(minutes_range) == 3:
+                                    job1.minute.during(minutes_range[0], minutes_range[1]).every(minutes_range[2])
+                                elif len(minutes_range) == 2:
+                                    job1.minute.during(minutes_range[0], minutes_range[1])
+                                elif len(minutes_range) == 1:
+                                    job1.minute.every(minutes_range[0])
 
-                        match core_act_data['auto_interval']:
-                            case 'hourly':
-                                job1.hour.every(int(core_act_data['auto_duration']))
-                            case 'daily':
-                                job1.day.every(int(core_act_data['auto_duration']))
-                            case 'monthly':
-                                job1.month.every(int(core_act_data['auto_duration']))
-                            case 'minute':
-                                job1.minute.every(int(core_act_data['auto_duration']))
+                        if 'hours' in core_act_data and core_act_data['hours']:
+                            hours_range = ast.literal_eval(core_act_data['hours'])
+                            if isinstance(hours_range, list):
+                                if len(hours_range) == 3:
+                                    job1.hour.during(hours_range[0], hours_range[1]).every(hours_range[2])
+                                elif len(hours_range) == 2:
+                                    job1.hour.during(hours_range[0], hours_range[1])
+                                elif len(hours_range) == 1:
+                                    job1.hour.every(hours_range[0])
 
-                        """
-                        job1.minute.during(5,50).every(5)
-                        job1.hour.every(4)
-                        job1.day.on(4, 5, 6)
+                        if 'dom' in core_act_data and core_act_data['dom']:
+                            dom_range = ast.literal_eval(core_act_data['dom'])
+                            if isinstance(dom_range, list):
+                                if len(dom_range) == 3:
+                                    job1.dom.during(dom_range[0], dom_range[1]).every(dom_range[2])
+                                elif len(dom_range) == 2:
+                                    job1.dom.during(dom_range[0], dom_range[1])
+                                elif len(dom_range) == 1:
+                                    job1.dom.every(dom_range[0])
 
-                        job1.dow.on('SUN')
-                        job1.dow.on('SUN', 'FRI')
-                        job1.month.during('APR', 'NOV')
-                        """
+                        if 'days' in core_act_data and core_act_data['days']:
+                            days_range = ast.literal_eval(core_act_data['days'])
+                            if isinstance(days_range, list):
+                                if len(days_range) == 3:
+                                    job1.dow.during(days_range[0], days_range[1]).every(days_range[2])
+                                elif len(days_range) == 2:
+                                    job1.dow.during(days_range[0], days_range[1])
+                                elif len(days_range) == 1:
+                                    job1.dow.every(days_range[0])
 
-                        await asyncio.to_thread(cron.write())
+                        if 'months' in core_act_data and core_act_data['months']:
+                            months_range = ast.literal_eval(core_act_data['months'])
+                            if isinstance(months_range, list):
+                                if len(months_range) == 3:
+                                    job1.month.during(months_range[0], months_range[1]).every(months_range[2])
+                                elif len(months_range) == 2:
+                                    job1.month.during(months_range[0], months_range[1])
+                                elif len(months_range) == 1:
+                                    job1.month.every(months_range[0])
+
+                        if job1.is_valid():
+                            await asyncio.to_thread(cron.write())
+                            await asyncio.sleep(1)
+                            self.logger.info(f"Cron job added: {job1}")
+                            await ws.send(json.dumps({
+                                'site': probe_obj.get('site'),
+                                'act_rslt': f"Cron job added for task {prb_task_action}.",
+                                'prb_id': probe_obj.get('prb_id'),
+                                'act_rslt_type': f'cron_job_{prb_task_action}',
+                                'act': "prb_task_rslt"
+                            }))
+                        else:
+                            self.logger.error("Invalid cron job, not writing to crontab.")
                     else:
-                        action = core_act_data['act']
-                        params = core_act_data['prms']
-
-                        match action:
+                        match prb_task_action:
                             case 'pcap_tux' | 'pcap_win':
                                 pcap.set_host(host=core_act_data['host'])
                                 pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
 
-                        handler = action_map.get(action)
+                        handler = action_map.get(prb_task_action)
                         if handler and params:
                             if inspect.iscoroutinefunction(handler):
                                 result = await handler(**params)
@@ -181,13 +207,13 @@ class CoreClient:
                             else:
                                 result = handler()
 
-                            # Build and serialize result before sending
                         umj_result_data = {
                                 'site': probe_obj.get('site'),
                                 'act_rslt': result,
                                 'prb_id': probe_obj.get('prb_id'),
-                                'act_rslt_type': f'{action}',
-                                'act': "prb_task_rslt"
+                                'act_rslt_type': f'{prb_task_action}',
+                                'act': "prb_task_rslt",
+                                'llm': core_act_data['llm_analysis']
                             }
                         await ws.send(json.dumps(umj_result_data))
 

@@ -139,9 +139,8 @@ async def init(init_data: InitCall):
                           'site': init_data.umj_site,
                           'name': init_data.prb_name,
                           'assigned_user': init_data.umj_usr,
-                          'umj_url': init_data.umj_url,
-                          'umj_url_init': init_url,
-                          'umj_api_key': init_data.umj_api_key}
+                          'umj_url': init_data.umj_url
+                          }
 
         if await prb_db.upload_db_data(id=probe_id, data=umj_probe_data) > 0:
             return Response(content='{"status": "ok"}', media_type="application/json", status_code=200)

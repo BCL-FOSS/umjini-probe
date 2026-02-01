@@ -302,9 +302,9 @@ async def device_fingerprint_scan(interface: Annotated[str, "The physical networ
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
     if target is not None:
-        code, output, error = await net_discv.device_fingerprint_scan(ip=target, limit=limit)
+        code, output, error = await net_discv.device_fingerprint_scan(subnet=target, limit=limit)
     else:
-        code, output, error = await net_discv.device_fingerprint_scan(ip=network, limit=limit)
+        code, output, error = await net_discv.device_fingerprint_scan(subnet=network, limit=limit)
   
     log_message=f""
     log_message+=f"{code}\n\n"

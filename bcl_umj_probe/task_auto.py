@@ -44,7 +44,7 @@ action_map: dict[str, Callable[[dict], object]] = {
     "pcap_win": pcap.pcap_remote_windows
 }
 
-async def automate_task(action: str, params: dict, ws_url: str, prb_id: str, site: str):
+async def automate_task(action: str, params: dict, ws_url: str, prb_id: str, site: str, llm: str):
     async with connect(uri=ws_url) as websocket:
         handler = action_map.get(action)
         if handler:
@@ -58,7 +58,8 @@ async def automate_task(action: str, params: dict, ws_url: str, prb_id: str, sit
                 'act_rslt': result,
                 'prb_id': prb_id,
                 'act_rslt_type': f'{action}',
-                'act': "prb_act_rslt"
+                'llm': llm,
+                'act': "prb_task_rslt"
                 }
             
             await websocket.send(json.dumps(umj_result_data))
@@ -94,6 +95,11 @@ if __name__ == "__main__":
         type=str, 
         help="Site for reporting results"
     )
+    parser.add_argument(
+        '-llm', '--llmanalysis', 
+        action='store_true', 
+        help="Enable debug logging"
+    )
     args = parser.parse_args()
 
-    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, site=args.site))
+    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, site=args.site, llm=args.llmanalysis))

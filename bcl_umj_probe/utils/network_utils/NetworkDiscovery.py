@@ -31,12 +31,11 @@ class NetworkDiscovery(Network):
                 
         return code, output, error
     
-    async def device_fingerprint_scan(self, ip: str, limit: bool = True):
+    async def device_fingerprint_scan(self, subnet: str, limit: bool = True):
         if limit is False:
-            code, output, error = await self.run_shell_cmd(cmd=f"nmap -e {self.interface} -O --osscan-guess {ip}")
+            code, output, error = await self.run_shell_cmd(cmd=f"nmap -e {self.interface} -O --osscan-guess {subnet}")
         else:
-            code, output, error = await self.run_shell_cmd(cmd=f"nmap -e {self.interface} -O --osscan-limit {ip}")
-
+            code, output, error = await self.run_shell_cmd(cmd=f"nmap -e {self.interface} -O --osscan-limit {subnet}")
         return code, output, error
     
     async def port_scan(self, subnet: str, ports: str='22,23,80,443,161,830'):
