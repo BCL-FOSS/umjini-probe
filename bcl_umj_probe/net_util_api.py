@@ -45,7 +45,7 @@ async def combined_lifespan(app:FastAPI):
             app.state.core_client_stop = None
 
             if probe_data.get("umj_url"):
-                ws_url = f"wss://{probe_data.get('umj_url')}/heartbeat?prb_id={probe_data.get('prb_id')}"
+                ws_url = f"wss://{probe_data.get('umj_url')}/heartbeat/{probe_data.get('prb_id')}"
                 core_client = CoreClient(umj_ws_url=ws_url)
                 stop_event = asyncio.Event()
                 app.state.core_client_stop = stop_event
