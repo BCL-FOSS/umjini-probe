@@ -158,12 +158,7 @@ class CoreClient:
                         if 'days' in core_act_data and core_act_data['days']:
                             days_range = ast.literal_eval(core_act_data['days'])
                             if isinstance(days_range, list):
-                                if len(days_range) == 3:
-                                    job1.dow.during(days_range[0], days_range[1]).every(days_range[2])
-                                elif len(days_range) == 2:
-                                    job1.dow.during(days_range[0], days_range[1])
-                                elif len(days_range) == 1:
-                                    job1.dow.every(days_range[0])
+                                job1.dow.on(days_range)
 
                         if 'months' in core_act_data and core_act_data['months']:
                             months_range = ast.literal_eval(core_act_data['months'])
@@ -175,7 +170,7 @@ class CoreClient:
                                 elif len(months_range) == 1:
                                     job1.month.every(months_range[0])
 
-                        if job1.is_valid():
+                        if await asyncio.to_thread(job1.is_valid()):
                             await asyncio.to_thread(cron.write())
                             await asyncio.sleep(1)
                             self.logger.info(f"Cron job added: {job1}")
