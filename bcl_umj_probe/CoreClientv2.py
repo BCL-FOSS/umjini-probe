@@ -126,7 +126,7 @@ class CoreClient:
                         job1=cron.new(command=f"python3 {script_path} -a {prb_task_action} -p '{params}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']}", comment=f"auto_task_{probe_obj.get('prb_id')}_{prb_task_action}")
 
                         if 'minutes' in core_act_data and core_act_data['minutes']:
-                            minutes_range = ast.literal_eval(core_act_data['minutes'])
+                            minutes_range = str(core_act_data['minutes']).split(",")
                             if isinstance(minutes_range, list):
                                 if len(minutes_range) == 3:
                                     job1.minute.during(minutes_range[0], minutes_range[1]).every(minutes_range[2])
@@ -136,7 +136,7 @@ class CoreClient:
                                     job1.minute.every(minutes_range[0])
 
                         if 'hours' in core_act_data and core_act_data['hours']:
-                            hours_range = ast.literal_eval(core_act_data['hours'])
+                            hours_range = str(core_act_data['hours']).split(",")
                             if isinstance(hours_range, list):
                                 if len(hours_range) == 3:
                                     job1.hour.during(hours_range[0], hours_range[1]).every(hours_range[2])
@@ -146,7 +146,7 @@ class CoreClient:
                                     job1.hour.every(hours_range[0])
 
                         if 'dom' in core_act_data and core_act_data['dom']:
-                            dom_range = ast.literal_eval(core_act_data['dom'])
+                            dom_range = str(core_act_data['dom']).split(",")
                             if isinstance(dom_range, list):
                                 if len(dom_range) == 3:
                                     job1.dom.during(dom_range[0], dom_range[1]).every(dom_range[2])
@@ -156,12 +156,12 @@ class CoreClient:
                                     job1.dom.every(dom_range[0])
 
                         if 'days' in core_act_data and core_act_data['days']:
-                            days_range = ast.literal_eval(core_act_data['days'])
+                            days_range = str(core_act_data['days']).split(",")
                             if isinstance(days_range, list):
                                 job1.dow.on(days_range)
 
                         if 'months' in core_act_data and core_act_data['months']:
-                            months_range = ast.literal_eval(core_act_data['months'])
+                            months_range = str(core_act_data['months']).split(",")
                             if isinstance(months_range, list):
                                 if len(months_range) == 3:
                                     job1.month.during(months_range[0], months_range[1]).every(months_range[2])
