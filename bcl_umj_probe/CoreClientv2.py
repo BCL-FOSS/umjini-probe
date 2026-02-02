@@ -207,15 +207,16 @@ class CoreClient:
                             else:
                                 result = handler()
 
-                        umj_result_data = {
+                        task_result = {
                                 'site': probe_obj.get('site'),
-                                'act_rslt': result,
+                                'task_output': result,
                                 'prb_id': probe_obj.get('prb_id'),
-                                'act_rslt_type': f'{prb_task_action}',
+                                'name': probe_obj.get('name'),
+                                'task_type': f'{prb_task_action}',
                                 'act': "prb_task_rslt",
                                 'llm': core_act_data['llm_analysis']
                             }
-                        await ws.send(json.dumps(umj_result_data))
+                        await ws.send(json.dumps(task_result))
 
         async def _heartbeat():
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
