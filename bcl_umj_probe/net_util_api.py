@@ -126,6 +126,7 @@ async def init(init_data: InitCall):
     probe_data['prb_api_key'] = init_data.prb_api_key
     probe_data['site'] = init_data.umj_site
     probe_data['name'] = init_data.prb_name
+    probe_data['assigned_user'] = init_data.umj_usr
     logger.info(probe_data)
 
     if await enrollment(payload=probe_data) != 200:
