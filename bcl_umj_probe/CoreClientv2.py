@@ -1,4 +1,5 @@
 import asyncio
+import re
 import websockets
 import os
 from websockets import ClientConnection, ConnectionClosed
@@ -23,6 +24,7 @@ net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
 pcap = PacketCapture()
 probe_util = ProbeInfo()
+cron=CronTab(user='root')
 
 net_discovery.set_interface(probe_util.get_ifaces()[0])
 
@@ -107,6 +109,7 @@ class CoreClient:
             stop_event = asyncio.Event()
 
         async def _receive():
+            
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
                 
                 raw_message = await ws.recv()
@@ -115,103 +118,189 @@ class CoreClient:
 
                 probe_id = core_act_data['prb_id']
                 if probe_id and probe_id == probe_obj.get('prb_id'):
-                    prb_task_action = core_act_data['task']
-                    params = core_act_data['prms']
+                    match core_act_data['oper']:
+                        case 'cmd':
+                            prb_task_action = core_act_data['task']
+                            params = core_act_data['prms']
 
-                    if core_act_data['automate'] == 'y':
-                        ws_url = f"wss://{probe_obj.get('umj_url')}/heartbeat/{probe_obj.get('prb_id')}"
-                        cron=CronTab()
-                        cwd = os.getcwd()
-                        script_path = os.path.join(cwd, 'task_auto.py')
-                        job1=cron.new(command=f"python3 {script_path} -a {prb_task_action} -p '{params}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']}", comment=f"auto_task_{probe_obj.get('prb_id')}_{prb_task_action}")
+                            if core_act_data['automate'] == 'y':
+                                ws_url = f"wss://{probe_obj.get('umj_url')}/heartbeat/{probe_obj.get('prb_id')}"
+                                cwd = os.getcwd()
+                                script_path = os.path.join(cwd, 'task_auto.py')
+                                job_comment=f"auto_task_{probe_obj.get('prb_id')}_{prb_task_action}"
+                                job1=cron.new(command=f"python3 {script_path} -a {prb_task_action} -p '{params}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']}", comment=job_comment)
 
-                        if 'minutes' in core_act_data and core_act_data['minutes']:
-                            minutes_range = str(core_act_data['minutes']).split(",")
-                            if isinstance(minutes_range, list):
-                                if len(minutes_range) == 3:
-                                    job1.minute.during(minutes_range[0], minutes_range[1]).every(minutes_range[2])
-                                elif len(minutes_range) == 2:
-                                    job1.minute.during(minutes_range[0], minutes_range[1])
-                                elif len(minutes_range) == 1:
-                                    job1.minute.every(minutes_range[0])
+                                if 'minutes' in core_act_data and core_act_data['minutes']:
+                                    minutes_range = str(core_act_data['minutes']).split(",")
+                                    if isinstance(minutes_range, list):
+                                        if len(minutes_range) == 3:
+                                            job1.minute.during(minutes_range[0], minutes_range[1]).every(minutes_range[2])
+                                        elif len(minutes_range) == 2:
+                                            job1.minute.during(minutes_range[0], minutes_range[1])
+                                        elif len(minutes_range) == 1:
+                                            job1.minute.every(minutes_range[0])
 
-                        if 'hours' in core_act_data and core_act_data['hours']:
-                            hours_range = str(core_act_data['hours']).split(",")
-                            if isinstance(hours_range, list):
-                                if len(hours_range) == 3:
-                                    job1.hour.during(hours_range[0], hours_range[1]).every(hours_range[2])
-                                elif len(hours_range) == 2:
-                                    job1.hour.during(hours_range[0], hours_range[1])
-                                elif len(hours_range) == 1:
-                                    job1.hour.every(hours_range[0])
+                                if 'hours' in core_act_data and core_act_data['hours']:
+                                    hours_range = str(core_act_data['hours']).split(",")
+                                    if isinstance(hours_range, list):
+                                        if len(hours_range) == 3:
+                                            job1.hour.during(hours_range[0], hours_range[1]).every(hours_range[2])
+                                        elif len(hours_range) == 2:
+                                            job1.hour.during(hours_range[0], hours_range[1])
+                                        elif len(hours_range) == 1:
+                                            job1.hour.every(hours_range[0])
 
-                        if 'dom' in core_act_data and core_act_data['dom']:
-                            dom_range = str(core_act_data['dom']).split(",")
-                            if isinstance(dom_range, list):
-                                if len(dom_range) == 3:
-                                    job1.dom.during(dom_range[0], dom_range[1]).every(dom_range[2])
-                                elif len(dom_range) == 2:
-                                    job1.dom.during(dom_range[0], dom_range[1])
-                                elif len(dom_range) == 1:
-                                    job1.dom.every(dom_range[0])
+                                if 'dom' in core_act_data and core_act_data['dom']:
+                                    dom_range = str(core_act_data['dom']).split(",")
+                                    if isinstance(dom_range, list):
+                                        if len(dom_range) == 3:
+                                            job1.dom.during(dom_range[0], dom_range[1]).every(dom_range[2])
+                                        elif len(dom_range) == 2:
+                                            job1.dom.during(dom_range[0], dom_range[1])
+                                        elif len(dom_range) == 1:
+                                            job1.dom.every(dom_range[0])
 
-                        if 'days' in core_act_data and core_act_data['days']:
-                            days_range = str(core_act_data['days']).split(",")
-                            if isinstance(days_range, list):
-                                job1.dow.on(days_range)
+                                if 'days' in core_act_data and core_act_data['days']:
+                                    days_range = str(core_act_data['days']).split(",")
+                                    if isinstance(days_range, list):
+                                        job1.dow.on(days_range)
 
-                        if 'months' in core_act_data and core_act_data['months']:
-                            months_range = str(core_act_data['months']).split(",")
-                            if isinstance(months_range, list):
-                                if len(months_range) == 3:
-                                    job1.month.during(months_range[0], months_range[1]).every(months_range[2])
-                                elif len(months_range) == 2:
-                                    job1.month.during(months_range[0], months_range[1])
-                                elif len(months_range) == 1:
-                                    job1.month.every(months_range[0])
+                                if 'months' in core_act_data and core_act_data['months']:
+                                    months_range = str(core_act_data['months']).split(",")
+                                    if isinstance(months_range, list):
+                                        if len(months_range) == 3:
+                                            job1.month.during(months_range[0], months_range[1]).every(months_range[2])
+                                        elif len(months_range) == 2:
+                                            job1.month.during(months_range[0], months_range[1])
+                                        elif len(months_range) == 1:
+                                            job1.month.every(months_range[0])
 
-                        if await asyncio.to_thread(job1.is_valid()):
+                                if await asyncio.to_thread(job1.is_valid()):
+                                    await asyncio.to_thread(cron.write())
+                                    await asyncio.sleep(1)
+                                    self.logger.info(f"Cron job added: {job1}")
+                                    await ws.send(json.dumps({
+                                        'site': probe_obj.get('site'),
+                                        'task_output': f"Cron job added for task {prb_task_action}.",
+                                        'prb_id': probe_obj.get('prb_id'),
+                                        'prb_name': probe_obj.get('name'),
+                                        'task_type': f'{prb_task_action}',
+                                        'name': f'cron_job_{prb_task_action}',
+                                        'act': "prb_task_cnfrm",
+                                        'comment': job_comment,
+                                        'enabled': 'enabled'
+                                    }))
+                                else:
+                                    self.logger.error("Invalid cron job, not writing to crontab.")
+                            else:
+                                match prb_task_action:
+                                    case 'pcap_tux' | 'pcap_win':
+                                        pcap.set_host(host=core_act_data['host'])
+                                        pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
+
+                                handler = action_map.get(prb_task_action)
+                                if handler and params:
+                                    if inspect.iscoroutinefunction(handler):
+                                        result = await handler(**params)
+                                    else:
+                                        result = handler(**params)
+                                        
+                                if handler:
+                                    if inspect.iscoroutinefunction(handler):
+                                        result = await handler()
+                                    else:
+                                        result = handler()
+
+                                task_result = {
+                                        'site': probe_obj.get('site'),
+                                        'task_output': result,
+                                        'prb_id': probe_obj.get('prb_id'),
+                                        'name': probe_obj.get('name'),
+                                        'task_type': f'{prb_task_action}',
+                                        'act': "prb_task_rslt",
+                                        'llm': core_act_data['llm_analysis']
+                                    }
+                                await ws.send(json.dumps(task_result))
+                        case 'disable_task':
+                            job = cron.find_comment(comment=core_act_data['comment'])
+                            #iter = cron.find_comment(re.compile(' or \w'))
+                            job.enable(False)
                             await asyncio.to_thread(cron.write())
                             await asyncio.sleep(1)
-                            self.logger.info(f"Cron job added: {job1}")
-                            await ws.send(json.dumps({
-                                'site': probe_obj.get('site'),
-                                'act_rslt': f"Cron job added for task {prb_task_action}.",
-                                'prb_id': probe_obj.get('prb_id'),
-                                'act_rslt_type': f'cron_job_{prb_task_action}',
-                                'act': "prb_task_rslt"
-                            }))
-                        else:
-                            self.logger.error("Invalid cron job, not writing to crontab.")
-                    else:
-                        match prb_task_action:
-                            case 'pcap_tux' | 'pcap_win':
-                                pcap.set_host(host=core_act_data['host'])
-                                pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
+                            core_act_data['enabled'] = 'disabled'
+                            await ws.send(json.dumps(core_act_data))
+                        case 'enable_task':
+                            job = cron.find_comment(comment=core_act_data['comment'])
+                            #iter = cron.find_comment(re.compile(' or \w'))
+                            job.enable()
+                            await asyncio.to_thread(cron.write())
+                            await asyncio.sleep(1)
+                        case 'rm_task':
+                            job = cron.find_comment(comment=core_act_data['comment'])
+                            #iter = cron.find_comment(re.compile(' or \w'))
+                            cron.remove( job )
+                            await asyncio.to_thread(cron.write())
+                            await asyncio.sleep(1)
+                        case 'rm_all_tasks':
+                            cron.remove_all()
+                            await asyncio.to_thread(cron.write())
+                            await asyncio.sleep(1)
+                        case 'resch_task':
+                            job = cron.find_comment(comment=core_act_data['comment'])
+                            if job:
+                                if 'minutes' in core_act_data and core_act_data['minutes']:
+                                    minutes_range = str(core_act_data['minutes']).split(",")
+                                    if isinstance(minutes_range, list):
+                                        if len(minutes_range) == 3:
+                                            job.minute.during(minutes_range[0], minutes_range[1]).every(minutes_range[2])
+                                        elif len(minutes_range) == 2:
+                                            job.minute.during(minutes_range[0], minutes_range[1])
+                                        elif len(minutes_range) == 1:
+                                            job.minute.every(minutes_range[0])
 
-                        handler = action_map.get(prb_task_action)
-                        if handler and params:
-                            if inspect.iscoroutinefunction(handler):
-                                result = await handler(**params)
-                            else:
-                                result = handler(**params)
+                                if 'hours' in core_act_data and core_act_data['hours']:
+                                    hours_range = str(core_act_data['hours']).split(",")
+                                    if isinstance(hours_range, list):
+                                        if len(hours_range) == 3:
+                                            job.hour.during(hours_range[0], hours_range[1]).every(hours_range[2])
+                                        elif len(hours_range) == 2:
+                                            job.hour.during(hours_range[0], hours_range[1])
+                                        elif len(hours_range) == 1:
+                                            job.hour.every(hours_range[0])
+
+                                if 'dom' in core_act_data and core_act_data['dom']:
+                                    dom_range = str(core_act_data['dom']).split(",")
+                                    if isinstance(dom_range, list):
+                                        if len(dom_range) == 3:
+                                            job.dom.during(dom_range[0], dom_range[1]).every(dom_range[2])
+                                        elif len(dom_range) == 2:
+                                            job.dom.during(dom_range[0], dom_range[1])
+                                        elif len(dom_range) == 1:
+                                            job.dom.every(dom_range[0])
+
+                                if 'days' in core_act_data and core_act_data['days']:
+                                    days_range = str(core_act_data['days']).split(",")
+                                    if isinstance(days_range, list):
+                                        job.dow.on(days_range)
+
+                                if 'months' in core_act_data and core_act_data['months']:
+                                    months_range = str(core_act_data['months']).split(",")
+                                    if isinstance(months_range, list):
+                                        if len(months_range) == 3:
+                                            job.month.during(months_range[0], months_range[1]).every(months_range[2])
+                                        elif len(months_range) == 2:
+                                            job.month.during(months_range[0], months_range[1])
+                                        elif len(months_range) == 1:
+                                            job.month.every(months_range[0])
                                 
-                        if handler:
-                            if inspect.iscoroutinefunction(handler):
-                                result = await handler()
-                            else:
-                                result = handler()
-
-                        task_result = {
-                                'site': probe_obj.get('site'),
-                                'task_output': result,
-                                'prb_id': probe_obj.get('prb_id'),
-                                'name': probe_obj.get('name'),
-                                'task_type': f'{prb_task_action}',
-                                'act': "prb_task_rslt",
-                                'llm': core_act_data['llm_analysis']
-                            }
-                        await ws.send(json.dumps(task_result))
+                                if await asyncio.to_thread(job.is_valid()):
+                                    await asyncio.to_thread(cron.write())
+                                    await asyncio.sleep(1)
+                                    self.logger.info(f"Cron job rescheduled: {job}")
+                                    core_act_data['enabled'] = 'enabled' if job.is_enabled() else 'disabled'
+                                    await ws.send(json.dumps(core_act_data))
+                        case _:
+                            self.logger.warning(f"Unknown operation received: {core_act_data['oper']}")
 
         async def _heartbeat():
             while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
