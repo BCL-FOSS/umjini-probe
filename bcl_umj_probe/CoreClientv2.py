@@ -119,18 +119,17 @@ class CoreClient:
                 probe_id = core_act_data['prb_id']
                 if probe_id and probe_id == probe_obj.get('prb_id'):
                     match core_act_data['oper']:
-                        case 'cmd':
-                            prb_task_action = core_act_data['task']
-                            params = core_act_data['prms']
+                        case 'init_task':
+                            if 'prms' in core_act_data and core_act_data['prms']:
+                                params = core_act_data['prms']
 
-                            if core_act_data['automate'] == 'y':
-                                ws_url = f"wss://{probe_obj.get('umj_url')}/heartbeat/{probe_obj.get('prb_id')}"
-                                cwd = os.getcwd()
-                                script_path = os.path.join(cwd, 'task_auto.py')
-                                job_comment=f"auto_task_{probe_obj.get('prb_id')}_{prb_task_action}"
-                                job1=cron.new(command=f"python3 {script_path} -a {prb_task_action} -p '{params}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']}", comment=job_comment)
+                            ws_url = f"wss://{probe_obj.get('umj_url')}/heartbeat/{probe_obj.get('prb_id')}"
+                            cwd = os.getcwd()
+                            script_path = os.path.join(cwd, 'task_auto.py')
+                            job_comment=f"auto_task_{probe_obj.get('prb_id')}_{core_act_data['task']}"
+                            job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{params}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']}", comment=job_comment)
 
-                                if 'minutes' in core_act_data and core_act_data['minutes']:
+                            if 'minutes' in core_act_data and core_act_data['minutes']:
                                     minutes_range = str(core_act_data['minutes']).split(",")
                                     if isinstance(minutes_range, list):
                                         if len(minutes_range) == 3:
@@ -140,7 +139,7 @@ class CoreClient:
                                         elif len(minutes_range) == 1:
                                             job1.minute.every(minutes_range[0])
 
-                                if 'hours' in core_act_data and core_act_data['hours']:
+                            if 'hours' in core_act_data and core_act_data['hours']:
                                     hours_range = str(core_act_data['hours']).split(",")
                                     if isinstance(hours_range, list):
                                         if len(hours_range) == 3:
@@ -150,7 +149,7 @@ class CoreClient:
                                         elif len(hours_range) == 1:
                                             job1.hour.every(hours_range[0])
 
-                                if 'dom' in core_act_data and core_act_data['dom']:
+                            if 'dom' in core_act_data and core_act_data['dom']:
                                     dom_range = str(core_act_data['dom']).split(",")
                                     if isinstance(dom_range, list):
                                         if len(dom_range) == 3:
@@ -160,12 +159,12 @@ class CoreClient:
                                         elif len(dom_range) == 1:
                                             job1.dom.every(dom_range[0])
 
-                                if 'days' in core_act_data and core_act_data['days']:
+                            if 'days' in core_act_data and core_act_data['days']:
                                     days_range = str(core_act_data['days']).split(",")
                                     if isinstance(days_range, list):
                                         job1.dow.on(days_range)
 
-                                if 'months' in core_act_data and core_act_data['months']:
+                            if 'months' in core_act_data and core_act_data['months']:
                                     months_range = str(core_act_data['months']).split(",")
                                     if isinstance(months_range, list):
                                         if len(months_range) == 3:
@@ -175,59 +174,34 @@ class CoreClient:
                                         elif len(months_range) == 1:
                                             job1.month.every(months_range[0])
 
-                                if await asyncio.to_thread(job1.is_valid()):
+                            if await asyncio.to_thread(job1.is_valid()):
                                     await asyncio.to_thread(cron.write())
                                     await asyncio.sleep(1)
                                     self.logger.info(f"Cron job added: {job1}")
                                     await ws.send(json.dumps({
                                         'site': probe_obj.get('site'),
-                                        'task_output': f"Cron job added for task {prb_task_action}.",
+                                        'task_output': f"Cron job added for task {core_act_data['task']}.",
                                         'prb_id': probe_obj.get('prb_id'),
                                         'prb_name': probe_obj.get('name'),
-                                        'task_type': f'{prb_task_action}',
-                                        'name': f'cron_job_{prb_task_action}',
+                                        'task_type': f'{core_act_data['task']}',
+                                        'name': f'cron_job_{core_act_data['task']}',
                                         'act': "prb_task_cnfrm",
                                         'comment': job_comment,
-                                        'enabled': 'enabled'
+                                        'enabled': 'enabled',
+                                        'storage_opt': 'new'
                                     }))
-                                else:
-                                    self.logger.error("Invalid cron job, not writing to crontab.")
                             else:
-                                match prb_task_action:
-                                    case 'pcap_tux' | 'pcap_win':
-                                        pcap.set_host(host=core_act_data['host'])
-                                        pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
-
-                                handler = action_map.get(prb_task_action)
-                                if handler and params:
-                                    if inspect.iscoroutinefunction(handler):
-                                        result = await handler(**params)
-                                    else:
-                                        result = handler(**params)
-                                        
-                                if handler:
-                                    if inspect.iscoroutinefunction(handler):
-                                        result = await handler()
-                                    else:
-                                        result = handler()
-
-                                task_result = {
-                                        'site': probe_obj.get('site'),
-                                        'task_output': result,
-                                        'prb_id': probe_obj.get('prb_id'),
-                                        'name': probe_obj.get('name'),
-                                        'task_type': f'{prb_task_action}',
-                                        'act': "prb_task_rslt",
-                                        'llm': core_act_data['llm_analysis']
-                                    }
-                                await ws.send(json.dumps(task_result))
+                                    self.logger.error("Invalid cron job, not writing to crontab.")
+                           
                         case 'disable_task':
                             job = cron.find_comment(comment=core_act_data['comment'])
                             #iter = cron.find_comment(re.compile(' or \w'))
                             job.enable(False)
                             await asyncio.to_thread(cron.write())
                             await asyncio.sleep(1)
-                            core_act_data['enabled'] = 'disabled'
+                            core_act_data['storage_opt'] = 'updt'
+                            core_act_data['act'] = 'prb_task_cnfrm'
+                            core_act_data['task_output'] = f"Cron job '{core_act_data['comment']}' disabled."
                             await ws.send(json.dumps(core_act_data))
                         case 'enable_task':
                             job = cron.find_comment(comment=core_act_data['comment'])
@@ -235,16 +209,26 @@ class CoreClient:
                             job.enable()
                             await asyncio.to_thread(cron.write())
                             await asyncio.sleep(1)
+                            core_act_data['storage_opt'] = 'updt'
+                            core_act_data['act'] = 'prb_task_cnfrm'
+                            core_act_data['task_output'] = f"Cron job '{core_act_data['comment']}' enabled."
+                            await ws.send(json.dumps(core_act_data))
                         case 'rm_task':
                             job = cron.find_comment(comment=core_act_data['comment'])
                             #iter = cron.find_comment(re.compile(' or \w'))
                             cron.remove( job )
                             await asyncio.to_thread(cron.write())
                             await asyncio.sleep(1)
+                            core_act_data['act'] = 'prb_task_cnfrm'
+                            core_act_data['task_output'] = f"Cron job '{core_act_data['comment']}' deleted."
+                            await ws.send(json.dumps(core_act_data))
                         case 'rm_all_tasks':
                             cron.remove_all()
                             await asyncio.to_thread(cron.write())
                             await asyncio.sleep(1)
+                            core_act_data['act'] = 'prb_task_cnfrm'
+                            core_act_data['task_output'] = f"All cron jobs deleted."
+                            await ws.send(json.dumps(core_act_data))
                         case 'resch_task':
                             job = cron.find_comment(comment=core_act_data['comment'])
                             if job:
@@ -298,7 +282,40 @@ class CoreClient:
                                     await asyncio.sleep(1)
                                     self.logger.info(f"Cron job rescheduled: {job}")
                                     core_act_data['enabled'] = 'enabled' if job.is_enabled() else 'disabled'
+                                    core_act_data['storage_opt'] = 'updt'
+                                    core_act_data['act'] = 'prb_task_cnfrm'
+                                    core_act_data['task_output'] = f"Cron job '{core_act_data['comment']}' rescheduled."
                                     await ws.send(json.dumps(core_act_data))
+                        case 'exec':
+                                
+                            match core_act_data['task']:
+                                case 'pcap_tux' | 'pcap_win':
+                                        pcap.set_host(host=core_act_data['host'])
+                                        pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
+
+                            handler = action_map.get(core_act_data['task'])
+                            if handler and params:
+                                    if inspect.iscoroutinefunction(handler):
+                                        result = await handler(**params)
+                                    else:
+                                        result = handler(**params)
+                                        
+                            if handler:
+                                    if inspect.iscoroutinefunction(handler):
+                                        result = await handler()
+                                    else:
+                                        result = handler()
+
+                            task_result = {
+                                        'site': probe_obj.get('site'),
+                                        'task_output': result,
+                                        'prb_id': probe_obj.get('prb_id'),
+                                        'name': probe_obj.get('name'),
+                                        'task_type': f'{core_act_data["task"]}',
+                                        'act': "prb_task_rslt",
+                                        'llm': core_act_data['llm_analysis']
+                                    }
+                            await ws.send(json.dumps(task_result))
                         case _:
                             self.logger.warning(f"Unknown operation received: {core_act_data['oper']}")
 
