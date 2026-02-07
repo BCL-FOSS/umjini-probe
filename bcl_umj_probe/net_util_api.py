@@ -312,7 +312,7 @@ async def execute_command(probe_id: str, cmd_data: ExecCall):
             )
         
         return Response(
-            content=json.dumps({"output": task_result}),
+            content=json.dumps(task_result),
             media_type="application/json",
             status_code=200
         )
