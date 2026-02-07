@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from time import timezone
 from fastapi import FastAPI, Depends, Response
 from fastapi_user_limiter.limiter import rate_limiter
 from pydantic import BaseModel
@@ -13,6 +14,15 @@ import os
 from utils.RedisDB import RedisDB
 from CoreClientv2 import CoreClient
 import asyncio
+import xmltodict
+import json
+from typing import Callable
+from utils.network_utils.NetworkDiscovery import NetworkDiscovery
+from utils.network_utils.NetworkTest import NetworkTest
+from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.network_utils.PacketCapture import PacketCapture
+from datetime import datetime, timedelta, timezone
+import inspect
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -23,13 +33,40 @@ class InitCall(BaseModel):
     prb_api_key: str
     prb_name: str
 
+class ScanCall(BaseModel):
+    scan_type: str
+    interface: str
+    file_name: str
+    params: dict
+
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
-
 prb_id, hstnm, probe_data = init_probe()
+probe_util = ProbeInfo()
+net_discovery = NetworkDiscovery()
+net_test = NetworkTest()
+pcap = PacketCapture()
+
+action_map: dict[str, Callable[[dict], object]] = {
+    "trcrt_dns": net_test.dnstraceroute,
+    "trcrt": net_test.traceroute,
+    "test_srvr": net_test.iperf_server,
+    "test_clnt": net_test.iperf_client,
+    "scan_arp": net_discovery.arp_scan,
+    "scan_custom": net_discovery.custom_scan,
+    "scan_dev_id": net_discovery.device_identification_scan,
+    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
+    "scan_full": net_discovery.full_network_scan,
+    "scan_snmp": net_discovery.snmp_scans,
+    "scan_port": net_discovery.port_scan,
+    "pcap_lcl": pcap.pcap_local,
+    "pcap_tux": pcap.pcap_remote_linux,
+    "pcap_win": pcap.pcap_remote_windows
+}
+
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
 
 mcp_app = mcp.http_app(path="/mcp")
@@ -147,3 +184,63 @@ async def init(init_data: InitCall):
             return Response(content='{"status": "ok"}', media_type="application/json", status_code=200)
         else:
             return Response(content='{"Error": "occurred during probe adoption"}', media_type="application/json", status_code=400)
+
+@api.post("/v1/api/probe/{probe_id}/scan", dependencies=[Depends(validate_api_key)])
+async def run_network_scan(probe_id: str, scan_data: ScanCall):
+    try:
+        params = scan_data.params
+        
+        await prb_db.connect_db()
+        probe_info = await prb_db.get_all_data(match=f"{probe_id}")
+        
+        if not probe_info:
+            return Response(
+                content='{"error": "Probe not found"}',
+                media_type="application/json",
+                status_code=404
+            )
+        
+        cur_dir = os.getcwd()
+
+        scan_dir = os.path.join(cur_dir, "nmap_scans")
+
+        if not os.path.exists(scan_dir):
+            os.makedirs(scan_dir)
+
+        timestamp = datetime.now(tz=timezone.utc).isoformat()
+
+        file=os.path.join(scan_dir, f"{scan_data.scan_type}_result_{timestamp}")
+        
+        params['subnet'] = probe_util.get_interface_subnet(interface=scan_data.interface)['network']
+        params['export_file_name'] = file
+
+        
+        handler = action_map.get(scan_data.scan_type)
+        if handler and params:
+            code, output, error = await handler(**params)
+        
+        if code != 0:
+            return Response(
+                content=json.dumps({"error": error}),
+                media_type="application/json",
+                status_code=500
+            )
+        
+        with open(file=f"{file}.xml") as xml_file:
+            nmap_dict = xmltodict.parse(xml_file.read())
+
+        nmap_json = json.dumps(nmap_dict)
+        
+        return Response(
+            content=nmap_json,
+            media_type="application/json",
+            status_code=200
+        )
+        
+    except Exception as e:
+        logger.exception(f"Error running network scan: {e}")
+        return Response(
+            content=json.dumps({"error": str(e)}),
+            media_type="application/json",
+            status_code=500
+        )

@@ -20,3 +20,4 @@ onetimesecret
 httpx
 websocket-client
 python-crontab
+xmltodict
