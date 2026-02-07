@@ -19,11 +19,17 @@ from websockets.asyncio.client import connect
 from crontab import CronTab
 import asyncio
 import ast
+from utils.LogAlert import LogAlert
+import xmltodict
+from datetime import datetime, timedelta, timezone
+from utils.Parsers import Parsers
 
 net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
 pcap = PacketCapture()
 probe_util = ProbeInfo()
+log_alert = LogAlert()
+parsers = Parsers()
 cron=CronTab(user='root')
 
 net_discovery.set_interface(probe_util.get_ifaces()[0])
@@ -127,7 +133,7 @@ class CoreClient:
                             cwd = os.getcwd()
                             script_path = os.path.join(cwd, 'task_auto.py')
                             job_comment=f"auto_task_{probe_obj.get('prb_id')}_{core_act_data['task']}"
-                            job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{params}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']}", comment=job_comment)
+                            job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']} -pdta '{json.dumps(probe_obj)}'", comment=job_comment)
 
                             if 'minutes' in core_act_data and core_act_data['minutes']:
                                     minutes_range = str(core_act_data['minutes']).split(",")
@@ -286,36 +292,98 @@ class CoreClient:
                                     core_act_data['act'] = 'prb_task_cnfrm'
                                     core_act_data['task_output'] = f"Cron job '{core_act_data['comment']}' rescheduled."
                                     await ws.send(json.dumps(core_act_data))
-                        case 'exec':
-                                
-                            match core_act_data['task']:
-                                case 'pcap_tux' | 'pcap_win':
-                                        pcap.set_host(host=core_act_data['host'])
-                                        pcap.set_credentials(user=core_act_data['usr'], password=core_act_data['pwd'])
+                        case 'exec':    
+                            if core_act_data['task'] != 'pcap_lcl':
+                                pcap.set_host(host=core_act_data['prms']['host'])
+                                pcap.set_credentials(user=core_act_data['prms']['usr'], password=core_act_data['prms']['pwd'])
 
                             handler = action_map.get(core_act_data['task'])
-                            if handler and params:
-                                    if inspect.iscoroutinefunction(handler):
-                                        result = await handler(**params)
-                                    else:
-                                        result = handler(**params)
-                                        
-                            if handler:
-                                    if inspect.iscoroutinefunction(handler):
-                                        result = await handler()
-                                    else:
-                                        result = handler()
+                            parameters = core_act_data['prms']
 
-                            task_result = {
+                            if handler and parameters:
+                                code, output, error = await handler(**parameters)
+
+                            if code != 0:
+                                log_message=f""
+                                log_message+=f"{code}\n\n"
+                                log_message+=f"{output}\n\n"
+                                log_message+=f"{error}"
+
+                                timestamp = datetime.now(tz=timezone.utc).isoformat()
+
+                                await log_alert.write_log(log_name=f"{core_act_data['task']}_result_{timestamp}", message=log_message)
+
+                                cur_dir = os.getcwd()
+
+                                scan_dir = os.path.join(cur_dir, "nmap_scans")
+
+                                if not os.path.exists(scan_dir):
+                                    os.makedirs(scan_dir)
+
+                                match core_act_data['task']:
+                                    case str() as s if s.startswith("scan_"):
+                                        exec_name = f"{core_act_data['task']}_result_{timestamp}"
+
+                                        file=os.path.join(scan_dir, exec_name)
+
+                                        file_name = f"{file}.xml"
+
+                                        parameters['export_file_name'] = file_name
+                                        parameters['subnet'] = probe_util.get_interface_subnet(interface=core_act_data['interface'])['network']
+
+                                        with open(file=f"{file}.xml") as xml_file:
+                                            nmap_dict = xmltodict.parse(xml_file.read())
+
+                                        #nmap_json = json.dumps(nmap_dict)
+                                        result = parsers.parse_nmap_json(nmap_dict)
+
+                                    case str() as s if s.startswith("trcrt"):
+                                        hops = parsers.parse_traceroute_output(output, core_act_data['task'])
+        
+                                        result = {
+                                            "source": probe_id,
+                                            "destination": parameters['target'],
+                                            "trace_type": core_act_data['task'],
+                                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                                            "hops": hops
+                                        }
+
+                                    case str() as s if s.startswith("test_"):
+                                        if core_act_data['task'] == 'test_srvr':
+                                            result = {
+                                                "mode": "server",
+                                                "server_ip": "0.0.0.0",
+                                                "server_port": "7969",
+                                                "status": "listening",
+                                                "timestamp": datetime.now(timezone.utc).isoformat()
+                                            }
+
+                                        if core_act_data['task'] == 'test_clnt':
+                                            iperf_data = json.loads(output)
+                                            result = parsers.parse_iperf_output(iperf_data)
+
+                                    case str() as s if s.startswith("pcap_"):
+                                        packets = parsers.parse_pcap_summary(output)
+        
+                                        result = {
+                                            "capture_mode": core_act_data['task'],
+                                            "interface": core_act_data['interface'],
+                                            "packet_count": len(packets),
+                                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                                            "packets": packets
+                                        }
+
+                                task_result = {
                                         'site': probe_obj.get('site'),
                                         'task_output': result,
                                         'prb_id': probe_obj.get('prb_id'),
-                                        'name': probe_obj.get('name'),
+                                        'name': exec_name,
+                                        'prb_name': probe_obj.get('name'),
                                         'task_type': f'{core_act_data["task"]}',
-                                        'act': "prb_task_rslt",
-                                        'llm': core_act_data['llm_analysis']
+                                        'timestamp': datetime.now(tz=timezone.utc).isoformat(),
+                                        'act': "prb_exec_rslt",
                                     }
-                            await ws.send(json.dumps(task_result))
+                                await ws.send(json.dumps(task_result))
                         case _:
                             self.logger.warning(f"Unknown operation received: {core_act_data['oper']}")
 

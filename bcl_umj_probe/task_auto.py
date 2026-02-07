@@ -14,6 +14,7 @@ from utils.network_utils.PacketCapture import PacketCapture
 from websockets.asyncio.client import connect
 import json
 from utils.RedisDB import RedisDB
+from utils.LogAlert import LogAlert
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ net_discovery = NetworkDiscovery()
 net_test = NetworkTest()
 pcap = PacketCapture()
 probe_util = ProbeInfo()
+log_alert = LogAlert()
 
 net_discovery.set_interface(probe_util.get_ifaces()[0])
 
@@ -44,25 +46,40 @@ action_map: dict[str, Callable[[dict], object]] = {
     "pcap_win": pcap.pcap_remote_windows
 }
 
-async def automate_task(action: str, params: dict, ws_url: str, prb_id: str, site: str, llm: str):
+async def automate_task(action: str, params: str, ws_url: str, probe_data: str):
     async with connect(uri=ws_url) as websocket:
-        handler = action_map.get(action)
-        if handler:
-            if asyncio.iscoroutinefunction(handler):
-                result = await handler(**params)
-            else:
-                result = handler(**params)
+        params_dict = json.loads(params)
+        probe_data_dict = json.loads(probe_data)
 
-            umj_result_data = {
-                'site': site,
-                'act_rslt': result,
-                'prb_id': prb_id,
-                'act_rslt_type': f'{action}',
-                'llm': llm,
-                'act': "prb_task_rslt"
+        if action == 'pcap_tux' or action == 'pcap_win':
+            pcap.set_host(host=params_dict['host'])
+            pcap.set_credentials(user=params_dict['usr'], password=params_dict['pwd'])
+
+        handler = action_map.get(action)
+        if handler and params_dict:
+            code, output, error = await handler(**params_dict)
+
+        if code != 0:
+            log_message=f""
+            log_message+=f"{code}\n\n"
+            log_message+=f"{output}\n\n"
+            log_message+=f"{error}"
+
+            timestamp = datetime.now(tz=timezone.utc).isoformat()
+
+            await log_alert.write_log(log_name=f"{action}_result_{timestamp}", message=log_message)
+
+            task_result = {
+                'site': probe_data_dict['site'],
+                'task_output': output,
+                'prb_id': probe_data_dict['prb_id'],
+                'name': probe_data_dict['name'],
+                'task_type': f'{action}',
+                'act': "prb_task_rslt",
+                'llm': params_dict['llm']
                 }
             
-            await websocket.send(json.dumps(umj_result_data))
+            await websocket.send(json.dumps(task_result))
         else:
             logger.error(f"Action '{action}' not found in action map.")
             return None
@@ -100,6 +117,11 @@ if __name__ == "__main__":
         action='store_true', 
         help="Enable debug logging"
     )
+    parser.add_argument(
+        '-pdta', '--probe_data', 
+        type=dict, 
+        help="Probe data for reporting results"
+    )
     args = parser.parse_args()
 
-    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, site=args.site, llm=args.llmanalysis))
+    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, site=args.site, llm=args.llmanalysis, probe_data=args.probe_data))
