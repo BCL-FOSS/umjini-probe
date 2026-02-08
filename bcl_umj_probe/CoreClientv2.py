@@ -293,7 +293,7 @@ class CoreClient:
                                     core_act_data['task_output'] = f"Cron job '{core_act_data['comment']}' rescheduled."
                                     await ws.send(json.dumps(core_act_data))
                         case 'exec':    
-                            if core_act_data['task'] != 'pcap_lcl':
+                            if core_act_data['task'] == 'pcap_tux' or core_act_data['task'] == 'pcap_win':
                                 pcap.set_host(host=core_act_data['prms']['host'])
                                 pcap.set_credentials(user=core_act_data['prms']['usr'], password=core_act_data['prms']['pwd'])
 
