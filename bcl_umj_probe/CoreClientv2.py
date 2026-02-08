@@ -71,7 +71,7 @@ class CoreClient:
 
     async def connect_with_backoff(self, ws_url: str, stop_event: Optional[asyncio.Event] = None):
         await self.prb_db.connect_db()
-        probe_data = await self.prb_db.get_all_data(match='prb-*')
+        probe_data = await self.prb_db.get_all_data(match='prb:*')
         probe_data_dict = next(iter(probe_data.values()))
 
         if stop_event is None:

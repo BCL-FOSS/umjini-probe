@@ -20,7 +20,7 @@ class ProbeInfo(Network):
     def gen_probe_register_data(self):
         id=self.gen_id()
         hostname=socket.gethostname()
-        probe_id=f"prb-{hostname}-{id}"
+        probe_id=f"prb:{hostname}:{id}"
 
         if probe_id and hostname:
             return probe_id, hostname

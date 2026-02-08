@@ -22,7 +22,7 @@ logger.info(f"Redis ping: {pong}")
 
 def init_probe():
     prb_id, hstnm = probe_utils.gen_probe_register_data()
-    cursor, keys = r.scan(cursor=0, match=f'*prb-*')
+    cursor, keys = r.scan(cursor=0, match=f'*prb:*')
 
     if not keys:
         probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
@@ -48,7 +48,7 @@ def init_probe():
 
 def validate_api_key(key: str = Depends(api_key_header)):
     _, hostname = probe_utils.gen_probe_register_data()
-    cursor, keys = r.scan(cursor=0, match=f'*prb-*')
+    cursor, keys = r.scan(cursor=0, match=f'*prb:*')
 
     if keys:
         for redis_key in keys:
@@ -58,7 +58,10 @@ def validate_api_key(key: str = Depends(api_key_header)):
             logger.info(stored_api_key)
 
             if not stored_api_key:
-                raise
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or missing API key"
+                )
 
             if bcrypt.verify(key, stored_api_key):
                 return 200

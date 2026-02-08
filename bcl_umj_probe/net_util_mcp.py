@@ -35,7 +35,7 @@ def verify_api(headers: dict[str, str]) -> None:
             detail="Missing API key in tool call"
         )
     _, hostname = probe_utils.gen_probe_register_data()
-    cursor, keys = r.scan(cursor=0, match=f'*prb-*')
+    cursor, keys = r.scan(cursor=0, match=f'*prb:*')
 
     if keys:
         for redis_key in keys:
