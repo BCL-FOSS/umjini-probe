@@ -24,7 +24,7 @@ from utils.network_utils.PacketCapture import PacketCapture
 from utils.Parsers import Parsers
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from utils.LogAlert import LogAlert
+from utils.alerts_utils.LogAlert import LogAlert
 
 class InitCall(BaseModel):
     umj_url: str 

@@ -19,7 +19,7 @@ from websockets.asyncio.client import connect
 from crontab import CronTab
 import asyncio
 import ast
-from utils.LogAlert import LogAlert
+from utils.alerts_utils.LogAlert import LogAlert
 import xmltodict
 from datetime import datetime, timedelta, timezone
 from utils.Parsers import Parsers
