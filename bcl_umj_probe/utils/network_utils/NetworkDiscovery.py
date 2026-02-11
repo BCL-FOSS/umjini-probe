@@ -7,8 +7,13 @@ class NetworkDiscovery(Network):
     def set_interface(self, iface: str):
         self.interface = iface
 
-    async def arp_scan(self, subnet: str, export_file_name: str):
-        code, output, error = await self.run_shell_cmd(cmd=f"nmap -e {self.interface} -sn -PR {subnet} -oX {export_file_name}")
+    async def arp_scan(self, subnet: str, export_file_name: str = None):
+        if export_file_name:
+            command = f"nmap -e {self.interface} -oX {export_file_name}"
+        else:
+            command = f"nmap -e {self.interface}"
+            
+        code, output, error = await self.run_shell_cmd(cmd=f"{command} -sn -PR {subnet}")
 
         return code, output, error
     
