@@ -17,7 +17,7 @@ class NetworkDiscovery(Network):
 
         return code, output, error
     
-    async def device_identification_scan(self, subnet: str, noise: False, export_file_name: str = None):
+    async def device_identification_scan(self, subnet: str, noise: bool = False, export_file_name: str = None):
         if noise is True:
             code, output, error = await self.run_shell_cmd(cmd=f"nmap -e {self.interface} -sS -O -sV {subnet} -oX {export_file_name}")
         else:

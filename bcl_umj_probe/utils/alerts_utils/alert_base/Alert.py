@@ -5,11 +5,11 @@ class Alert:
     def __init__(self):
         pass
 
-    async def make_request(self, cmd:str, url: str, headers: dict, auth: tuple = None, payload: dict = None):
+    async def make_request(self, cmd:str, url: str, headers: dict, auth: tuple = None, payload: dict = None, cookies: str = None):
 
         async with httpx.AsyncClient() as client:
             match cmd:
-                case 'p':
+                case 'pa':
                     response = await client.post(
                         url,
                         headers=headers,
@@ -22,11 +22,22 @@ class Alert:
                         headers=headers,
                         auth=auth
                     )
+
+                    return response
+
+                case 'p':
+                    client.cookies.set("access_token", value=cookies)
+                    response = await client.post(
+                        url,
+                        headers=headers,
+                        json=payload,
+                    )  
             
             resp_data = response.json()
 
-            await response.aclose()
-
-        return json.dumps(resp_data, sort_keys=True, indent=4, separators=(",", ": "))
+        if cmd == 'pa':
+            return json.dumps(resp_data, sort_keys=True, indent=4, separators=(",", ": "))
+        
+        return json.dumps(resp_data)
 
     

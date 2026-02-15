@@ -2,7 +2,10 @@ from slack_sdk.web.async_client import AsyncWebClient
 import os
 
 class SlackAlert():
-    def __init__(self, slack_bot_token: str = None, slack_channel_id: str = None):
+    def __init__(self):
+        pass
+
+    def set_slack_connection_info(self, slack_bot_token: str, slack_channel_id: str):
         self.token = slack_bot_token
         self.channel_id = slack_channel_id
         self.client = AsyncWebClient(token=self.token)

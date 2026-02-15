@@ -7,9 +7,11 @@ logging.basicConfig(level=logging.INFO)
 class EmailSenderHandler:
     def __init__(self, brevo_api_key: str):
         self.configuration = brevo_python.Configuration()
+        self.logger = logging.getLogger(__name__)
+
+    def set_brevo_api_key(self, brevo_api_key: str):
         self.configuration.api_key['api-key'] = brevo_api_key
         self.configuration.api_key['partner-key'] = brevo_api_key
-        self.logger = logging.getLogger(__name__)
 
     def add_contact(self, email: str, ext_id:str, attributes: dict = None):
         api_instance = brevo_python.ContactsApi(brevo_python.ApiClient(self.configuration))

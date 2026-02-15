@@ -5,12 +5,61 @@ from utils.network_utils.ProbeInfo import ProbeInfo
 import logging
 from passlib.hash import bcrypt
 import os
+from typing import Callable
+from utils.network_utils.NetworkDiscovery import NetworkDiscovery
+from utils.network_utils.NetworkTest import NetworkTest
+from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.network_utils.PacketCapture import PacketCapture
+from utils.alerts_utils.SlackAlert import SlackAlert
+from utils.alerts_utils.JiraSM import JiraSM
+from utils.alerts_utils.EmailSenderHandler import EmailSenderHandler
+from utils.alerts_utils.alert_base.BotConnection import BotConnection
+import logging
+from crontab import CronTab
+from utils.alerts_utils.LogAlert import LogAlert
+from utils.Parsers import Parsers
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logging.getLogger("fakeredis").setLevel(logging.WARNING)
 logging.getLogger("docket.worker").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+
+net_discovery = NetworkDiscovery()
+net_test = NetworkTest()
+pcap = PacketCapture()
+probe_util = ProbeInfo()
+log_alert = LogAlert()
+slack_alert = SlackAlert()
+jira_alert = JiraSM()
+email_alert = EmailSenderHandler()
+bot_connection = BotConnection()
+parsers = Parsers()
+cron=CronTab(user='root')
+
+net_discovery.set_interface(probe_util.get_ifaces()[0])
+
+action_map: dict[str, Callable[[dict], object]] = {
+    "trcrt_dns": net_test.dnstraceroute,
+    "trcrt": net_test.traceroute,
+    "test_srvr": net_test.iperf_server,
+    "test_clnt": net_test.iperf_client,
+    "scan_arp": net_discovery.arp_scan,
+    "scan_custom": net_discovery.custom_scan,
+    "scan_dev_id": net_discovery.device_identification_scan,
+    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
+    "scan_full": net_discovery.full_network_scan,
+    "scan_snmp": net_discovery.snmp_scans,
+    "scan_port": net_discovery.port_scan,
+    "pcap_lcl": pcap.pcap_local,
+    "pcap_tux": pcap.pcap_remote_linux,
+    "pcap_win": pcap.pcap_remote_windows,
+    "slack": slack_alert.send_alert_message,
+    "jira": jira_alert.send_alert,
+    "bot": bot_connection.send_bot_message,
+    "email": email_alert.send_transactional_email,
+
+}
 
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 

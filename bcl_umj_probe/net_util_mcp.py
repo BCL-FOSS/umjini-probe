@@ -16,18 +16,12 @@ from utils.alerts_utils.EmailSenderHandler import EmailSenderHandler
 from utils.alerts_utils.SlackAlert import SlackAlert
 from utils.alerts_utils.JiraSM import JiraSM
 import os
+from init_app import action_map, net_discovery, net_test, pcap, probe_util, log_alert, parsers, cron, slack_alert, jira_alert, email_alert
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
-
 probe_utils = ProbeInfo()
-net_test = NetworkTest()
-net_snmp = NetworkSNMP()
-log_alert = LogAlert()
-email_sender = EmailSenderHandler()
-slack_alert = SlackAlert()
-jira_sm = JiraSM()
 
 r = redis.Redis(host=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'), decode_responses=True)
 pong = r.ping()
@@ -198,16 +192,14 @@ async def arp_scan(interface: Annotated[str, "The physical network interface por
     header_data = get_http_headers()
     verify_api(header_data)
 
-    net_discv = NetworkDiscovery()
-
     iface, network = probe_utils.get_default_interface_subnet()
-    net_discv.set_interface(iface=iface)
+    net_discovery.set_interface(iface=iface)
 
     if interface is not None:
-        net_discv.set_interface(interface)
+        net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
-    code, output, error = await net_discv.arp_scan(subnet=network)
+    code, output, error = await net_discovery.arp_scan(subnet=network)
 
     log_message=f""
     log_message+=f"{code}\n\n"
@@ -225,25 +217,23 @@ async def device_identifcation_scan(enable_os_detection: Annotated[bool, "Enable
     header_data = get_http_headers()
     verify_api(header_data)
 
-    net_discv = NetworkDiscovery()
-
     iface, network = probe_utils.get_default_interface_subnet()
-    net_discv.set_interface(iface=iface)
+    net_discovery.set_interface(iface=iface)
 
     if interface is not None:
-        net_discv.set_interface(interface)
+        net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
     if enable_os_detection is True and target is not None:
-        code, output, error = await net_discv.device_identification_scan(subnet=target, noise=True)
+        code, output, error = await net_discovery.device_identification_scan(subnet=target, noise=True)
 
     if enable_os_detection is True:
-        code, output, error = await net_discv.device_identification_scan(subnet=network, noise=True)
+        code, output, error = await net_discovery.device_identification_scan(subnet=network, noise=True)
  
     if target is not None:
-        code, output, error = await net_discv.device_identification_scan(subnet=target)
+        code, output, error = await net_discovery.device_identification_scan(subnet=target)
     else:
-        code, output, error = await net_discv.device_identification_scan(subnet=network)
+        code, output, error = await net_discovery.device_identification_scan(subnet=network)
 
     log_message=f""
     log_message+=f"{code}\n\n"
@@ -261,25 +251,23 @@ async def snmp_scan(type: Annotated[str, "Determines the type of SNMP scan used.
     header_data = get_http_headers()
     verify_api(header_data)
 
-    net_discv = NetworkDiscovery()
-
     iface, network = probe_utils.get_default_interface_subnet()
-    net_discv.set_interface(iface=iface)
+    net_discovery.set_interface(iface=iface)
 
     if interface is not None:
-        net_discv.set_interface(interface)
+        net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
     if target is not None and scripts is not None:
-        code, output, error = await net_discv.snmp_scans(subnet=target, type=type, scripts=scripts)
+        code, output, error = await net_discovery.snmp_scans(subnet=target, type=type, scripts=scripts)
 
     if scripts is not None:
-        code, output, error = await net_discv.snmp_scans(subnet=network, type=type, scripts=scripts)
+        code, output, error = await net_discovery.snmp_scans(subnet=network, type=type, scripts=scripts)
 
     if target is not None:
-        code, output, error = await net_discv.snmp_scans(subnet=target, type=type)
+        code, output, error = await net_discovery.snmp_scans(subnet=target, type=type)
     else:
-        code, output, error = await net_discv.snmp_scans(subnet=network, type=type)
+        code, output, error = await net_discovery.snmp_scans(subnet=network, type=type)
 
 
     log_message=f""
@@ -298,19 +286,17 @@ async def device_fingerprint_scan(interface: Annotated[str, "The physical networ
     header_data = get_http_headers()
     verify_api(header_data)
 
-    net_discv = NetworkDiscovery()
-
     iface, network = probe_utils.get_default_interface_subnet()
-    net_discv.set_interface(iface=iface)
+    net_discovery.set_interface(iface=iface)
 
     if interface is not None:
-        net_discv.set_interface(interface)
+        net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
     if target is not None:
-        code, output, error = await net_discv.device_fingerprint_scan(subnet=target, limit=limit)
+        code, output, error = await net_discovery.device_fingerprint_scan(subnet=target, limit=limit)
     else:
-        code, output, error = await net_discv.device_fingerprint_scan(subnet=network, limit=limit)
+        code, output, error = await net_discovery.device_fingerprint_scan(subnet=network, limit=limit)
   
     log_message=f""
     log_message+=f"{code}\n\n"
@@ -328,26 +314,24 @@ async def port_scan(interface: Annotated[str, "The physical network interface po
     header_data = get_http_headers()
     verify_api(header_data)
 
-    net_discv = NetworkDiscovery()
-
     iface, network = probe_utils.get_default_interface_subnet()
-    net_discv.set_interface(iface=iface)
+    net_discovery.set_interface(iface=iface)
 
     if interface is not None:
-        net_discv.set_interface(interface)
+        net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
     if target is not None and ports is not None:
-        code, output, error = await net_discv.port_scan(subnet=target, ports=ports)
+        code, output, error = await net_discovery.port_scan(subnet=target, ports=ports)
 
     if target is not None:
-        code, output, error = await net_discv.port_scan(subnet=target)
+        code, output, error = await net_discovery.port_scan(subnet=target)
 
     if ports is not None:
-        code, output, error = await net_discv.port_scan(ports=ports)
+        code, output, error = await net_discovery.port_scan(ports=ports)
 
     else:
-        code, output, error = await net_discv.port_scan(subnet=network)
+        code, output, error = await net_discovery.port_scan(subnet=network)
 
     log_message=f""
     log_message+=f"{code}\n\n"
@@ -365,20 +349,18 @@ async def custom_scan( options: Annotated[str, "The nmap scan options to run."],
     header_data = get_http_headers()
     verify_api(header_data)
 
-    net_discv = NetworkDiscovery()
-
     iface, network = probe_utils.get_default_interface_subnet()
-    net_discv.set_interface(iface=iface)
+    net_discovery.set_interface(iface=iface)
 
     if interface is not None:
-        net_discv.set_interface(interface)
+        net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
     if target is not None and options is not None:
-        code, output, error = await net_discv.custom_scan(subnet=target, options=options)
+        code, output, error = await net_discovery.custom_scan(subnet=target, options=options)
     
     if options is not None:
-        code, output, error = await net_discv.custom_scan(subnet=network, options=options)
+        code, output, error = await net_discovery.custom_scan(subnet=network, options=options)
 
     log_message=f""
     log_message+=f"{code}\n\n"
@@ -396,16 +378,14 @@ async def full_scan(interface: Annotated[str, "The physical network interface po
     header_data = get_http_headers()
     verify_api(header_data)
 
-    net_discv = NetworkDiscovery()
-
     iface, network = probe_utils.get_default_interface_subnet()
-    net_discv.set_interface(iface=iface)
+    net_discovery.set_interface(iface=iface)
 
     if interface is not None:
-        net_discv.set_interface(interface)
+        net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
 
-    code, output, error = await net_discv.full_network_scan(subnet=network)
+    code, output, error = await net_discovery.full_network_scan(subnet=network)
 
     log_message=f""
     log_message+=f"{code}\n\n"
@@ -422,8 +402,6 @@ async def pcap_local(interface: Annotated[str, "The physical network interface p
 
     header_data = get_http_headers()
     verify_api(header_data)
-
-    pcap = PacketCapture()
 
     iface, network = probe_utils.get_default_interface_subnet()
 
@@ -455,8 +433,6 @@ async def pcap_remote_linux(remote_interface: Annotated[str, "The physical netwo
     header_data = get_http_headers()
     verify_api(header_data)
 
-    pcap = PacketCapture()
-
     pcap.set_host(host=host)
 
     pcap.set_credentials(user=username, password=password)
@@ -481,8 +457,6 @@ async def pcap_remote_windows(remote_interface: Annotated[str, "The physical net
 
     header_data = get_http_headers()
     verify_api(header_data)
-
-    pcap = PacketCapture()
 
     pcap.set_host(host=host)
 

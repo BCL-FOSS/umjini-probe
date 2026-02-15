@@ -2,11 +2,13 @@ from alert_base.Alert import Alert
 import json
 
 class JiraSM(Alert):
-    def __init__(self, cloud_id: str, auth_email: str, auth_token: str):
+    def __init__(self):
+        super().__init__()
+
+    def set_jira_connection_info(self, cloud_id: str, auth_email: str, auth_token: str):
         self.cloud_id = cloud_id
         self.auth_token = auth_token
         self.auth_email = auth_email
-        super().__init__()
 
     async def send_alert(self, message: str, desc: str, note: str, source: str, entity: str, alias: str, priority: str, actions: list, extra_properties: dict):
         url = f"https://api.atlassian.com/jsm/ops/api/{self.cloud_id}/v1/alerts"

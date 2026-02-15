@@ -23,33 +23,7 @@ from utils.alerts_utils.LogAlert import LogAlert
 import xmltodict
 from datetime import datetime, timedelta, timezone
 from utils.Parsers import Parsers
-
-net_discovery = NetworkDiscovery()
-net_test = NetworkTest()
-pcap = PacketCapture()
-probe_util = ProbeInfo()
-log_alert = LogAlert()
-parsers = Parsers()
-cron=CronTab(user='root')
-
-net_discovery.set_interface(probe_util.get_ifaces()[0])
-
-action_map: dict[str, Callable[[dict], object]] = {
-    "trcrt_dns": net_test.dnstraceroute,
-    "trcrt": net_test.traceroute,
-    "test_srvr": net_test.iperf_server,
-    "test_clnt": net_test.iperf_client,
-    "scan_arp": net_discovery.arp_scan,
-    "scan_custom": net_discovery.custom_scan,
-    "scan_dev_id": net_discovery.device_identification_scan,
-    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
-    "scan_full": net_discovery.full_network_scan,
-    "scan_snmp": net_discovery.snmp_scans,
-    "scan_port": net_discovery.port_scan,
-    "pcap_lcl": pcap.pcap_local,
-    "pcap_tux": pcap.pcap_remote_linux,
-    "pcap_win": pcap.pcap_remote_windows
-}
+from init_app import action_map, net_discovery, net_test, pcap, probe_util, log_alert, parsers, cron
 
 class CoreClient:
     def __init__(self, umj_ws_url: str):
@@ -133,7 +107,7 @@ class CoreClient:
                             cwd = os.getcwd()
                             script_path = os.path.join(cwd, 'task_auto.py')
                             job_comment=f"auto_task_{probe_obj.get('prb_id')}_{core_act_data['task']}"
-                            job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']} -pdta '{json.dumps(probe_obj)}'", comment=job_comment)
+                            job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']} -pdta '{json.dumps(probe_obj)}' -n {job_comment}", comment=job_comment)
 
                             if 'minutes' in core_act_data and core_act_data['minutes']:
                                     minutes_range = str(core_act_data['minutes']).split(",")
@@ -300,38 +274,41 @@ class CoreClient:
                             handler = action_map.get(core_act_data['task'])
                             parameters = core_act_data['prms']
 
+                            if core_act_data['task'].startswith("scan_"):
+                                cur_dir = os.getcwd()
+                                scan_dir = os.path.join(cur_dir, "nmap_scans")
+                                if not os.path.exists(scan_dir):
+                                    os.makedirs(scan_dir)
+
+                                timestamp = datetime.now(tz=timezone.utc).isoformat()
+                                exec_name = f"{core_act_data['task']}_result_{timestamp}"
+                                file=os.path.join(scan_dir, exec_name)
+                                file_name = f"{file}.xml"
+                                parameters['export_file_name'] = file_name
+
+                                if 'interface' not in parameters or not parameters['interface']:
+                                    net_discovery.set_interface(probe_util.get_ifaces()[0])
+                                    parameters['subnet'] = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
+
+                                if 'subnet' not in parameters or not parameters['subnet'] and parameters['interface']:
+                                    net_discovery.set_interface(parameters['interface'])
+                                    parameters['subnet'] = probe_util.get_interface_subnet(interface=parameters['interface'])['network']
+
                             if handler and parameters:
                                 code, output, error = await handler(**parameters)
 
-                            if code != 0:
+                            if code == 0:
                                 log_message=f""
                                 log_message+=f"{code}\n\n"
                                 log_message+=f"{output}\n\n"
                                 log_message+=f"{error}"
 
-                                timestamp = datetime.now(tz=timezone.utc).isoformat()
-
                                 await log_alert.write_log(log_name=f"{core_act_data['task']}_result_{timestamp}", message=log_message)
-
-                                cur_dir = os.getcwd()
-
-                                scan_dir = os.path.join(cur_dir, "nmap_scans")
-
-                                if not os.path.exists(scan_dir):
-                                    os.makedirs(scan_dir)
 
                                 match core_act_data['task']:
                                     case str() as s if s.startswith("scan_"):
-                                        exec_name = f"{core_act_data['task']}_result_{timestamp}"
-
-                                        file=os.path.join(scan_dir, exec_name)
-
-                                        file_name = f"{file}.xml"
-
-                                        parameters['export_file_name'] = file_name
-                                        parameters['subnet'] = probe_util.get_interface_subnet(interface=core_act_data['interface'])['network']
-
-                                        with open(file=f"{file}.xml") as xml_file:
+                                        
+                                        with open(file=f"{file_name}") as xml_file:
                                             nmap_dict = xmltodict.parse(xml_file.read())
 
                                         #nmap_json = json.dumps(nmap_dict)
@@ -381,7 +358,8 @@ class CoreClient:
                                         'prb_name': probe_obj.get('name'),
                                         'task_type': f'{core_act_data["task"]}',
                                         'timestamp': datetime.now(tz=timezone.utc).isoformat(),
-                                        'act': "prb_exec_rslt",
+                                        'act': "prb_task_rslt",
+                                        'llm': core_act_data['llm']
                                     }
                                 await ws.send(json.dumps(task_result))
                         case _:

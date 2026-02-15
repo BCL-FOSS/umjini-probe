@@ -1,52 +1,22 @@
 from datetime import datetime
-from uuid import uuid4
 import asyncio
 import argparse
 import os
-from passlib.hash import bcrypt
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Callable
-from utils.network_utils.NetworkDiscovery import NetworkDiscovery
-from utils.network_utils.NetworkTest import NetworkTest
-from utils.network_utils.ProbeInfo import ProbeInfo
-from utils.network_utils.PacketCapture import PacketCapture
+from datetime import datetime, timezone
 from websockets.asyncio.client import connect
 import json
 from utils.RedisDB import RedisDB
-from utils.LogAlert import LogAlert
+from init_app import action_map, pcap, log_alert, parsers, net_discovery, net_test, slack_alert, jira_alert, email_alert, bot_connection, probe_util
+import xmltodict
+from net_util_api import prb_id
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 
-net_discovery = NetworkDiscovery()
-net_test = NetworkTest()
-pcap = PacketCapture()
-probe_util = ProbeInfo()
-log_alert = LogAlert()
-
-net_discovery.set_interface(probe_util.get_ifaces()[0])
-
-action_map: dict[str, Callable[[dict], object]] = {
-    "trcrt_dns": net_test.dnstraceroute,
-    "trcrt": net_test.traceroute,
-    "test_srvr": net_test.iperf_server,
-    "test_clnt": net_test.iperf_client,
-    "scan_arp": net_discovery.arp_scan,
-    "scan_custom": net_discovery.custom_scan,
-    "scan_dev_id": net_discovery.device_identification_scan,
-    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
-    "scan_full": net_discovery.full_network_scan,
-    "scan_snmp": net_discovery.snmp_scans,
-    "scan_port": net_discovery.port_scan,
-    "pcap_lcl": pcap.pcap_local,
-    "pcap_tux": pcap.pcap_remote_linux,
-    "pcap_win": pcap.pcap_remote_windows
-}
-
-async def automate_task(action: str, params: str, ws_url: str, probe_data: str):
+async def automate_task(action: str, params: str, ws_url: str, probe_data: str, task_name: str):
     async with connect(uri=ws_url) as websocket:
         params_dict = json.loads(params)
         probe_data_dict = json.loads(probe_data)
@@ -54,6 +24,26 @@ async def automate_task(action: str, params: str, ws_url: str, probe_data: str):
         if action == 'pcap_tux' or action == 'pcap_win':
             pcap.set_host(host=params_dict['host'])
             pcap.set_credentials(user=params_dict['usr'], password=params_dict['pwd'])
+
+        if action.startswith("scan_"):
+            cur_dir = os.getcwd()
+            scan_dir = os.path.join(cur_dir, "nmap_scans")
+            if not os.path.exists(scan_dir):
+                                    os.makedirs(scan_dir)
+
+            timestamp = datetime.now(tz=timezone.utc).isoformat()
+            exec_name = f"{action}_result_{timestamp}"
+            file=os.path.join(scan_dir, exec_name)
+            file_name = f"{file}.xml"
+            params_dict['export_file_name'] = file_name
+
+            if 'interface' not in params_dict or not params_dict['interface']:
+                net_discovery.set_interface(probe_util.get_ifaces()[0])
+                params_dict['subnet'] = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
+
+            if 'subnet' not in params_dict or not params_dict['subnet'] and params_dict['interface']:
+                net_discovery.set_interface(params_dict['interface'])
+                params_dict['subnet'] = probe_util.get_interface_subnet(interface=params_dict['interface'])['network']
 
         handler = action_map.get(action)
         if handler and params_dict:
@@ -69,15 +59,61 @@ async def automate_task(action: str, params: str, ws_url: str, probe_data: str):
 
             await log_alert.write_log(log_name=f"{action}_result_{timestamp}", message=log_message)
 
+            match action:
+                case str() as s if s.startswith("scan_"):
+                                        
+                    with open(file=f"{file_name}") as xml_file:
+                        nmap_dict = xmltodict.parse(xml_file.read())
+
+                                        #nmap_json = json.dumps(nmap_dict)
+                        result = parsers.parse_nmap_json(nmap_dict)
+
+                case str() as s if s.startswith("trcrt"):
+                    hops = parsers.parse_traceroute_output(output, action)
+        
+                    result = {
+                        "source": prb_id,
+                        "destination": params_dict['target'],
+                        "trace_type": action,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "hops": hops
+                    }
+
+                case str() as s if s.startswith("test_"):
+                    if action == 'test_srvr':
+                        result = {
+                            "mode": "server",
+                            "server_ip": "0.0.0.0",
+                            "server_port": "7969",
+                            "status": "listening",
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+
+                    if action == 'test_clnt':
+                        iperf_data = json.loads(output)
+                        result = parsers.parse_iperf_output(iperf_data)
+
+                case str() as s if s.startswith("pcap_"):
+                    packets = parsers.parse_pcap_summary(output)
+        
+                    result = {
+                        "capture_mode": action,
+                        "interface": params_dict['interface'],
+                        "packet_count": len(packets),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "packets": packets
+                    }
             task_result = {
                 'site': probe_data_dict['site'],
-                'task_output': output,
+                'task_output': result,
                 'prb_id': probe_data_dict['prb_id'],
-                'name': probe_data_dict['name'],
-                'task_type': f'{action}',
+                'prb_name': probe_data_dict['name'],
+                'task_type': action,
+                'timestamp': datetime.now(tz=timezone.utc).isoformat(),
                 'act': "prb_task_rslt",
+                'name': task_name,
                 'llm': params_dict['llm']
-                }
+                                    }
             
             await websocket.send(json.dumps(task_result))
         else:
@@ -94,7 +130,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-p', '--params', 
         type=dict, 
-        help="Parameters for the network task"
+        help="params_dict for the network task"
     )
     parser.add_argument(
         '-w', '--ws_url', 
@@ -122,6 +158,11 @@ if __name__ == "__main__":
         type=dict, 
         help="Probe data for reporting results"
     )
+    parser.add_argument(
+        '-n', '--name', 
+        type=str, 
+        help="Name for reporting results"
+    )
     args = parser.parse_args()
 
-    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, site=args.site, llm=args.llmanalysis, probe_data=args.probe_data))
+    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, site=args.site, llm=args.llmanalysis, probe_data=args.probe_data, name=args.name))

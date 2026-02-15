@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-from time import timezone
 from fastapi import FastAPI, Depends, Response
 from fastapi_user_limiter.limiter import rate_limiter
 from pydantic import BaseModel
@@ -14,17 +13,7 @@ import os
 from utils.RedisDB import RedisDB
 from CoreClientv2 import CoreClient
 import asyncio
-import xmltodict
-import json
-from typing import Callable
-from utils.network_utils.NetworkDiscovery import NetworkDiscovery
-from utils.network_utils.NetworkTest import NetworkTest
 from utils.network_utils.ProbeInfo import ProbeInfo
-from utils.network_utils.PacketCapture import PacketCapture
-from utils.Parsers import Parsers
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from utils.alerts_utils.LogAlert import LogAlert
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -42,28 +31,6 @@ logger = logging.getLogger(__name__)
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 prb_id, hstnm, probe_data = init_probe()
 probe_util = ProbeInfo()
-net_discovery = NetworkDiscovery()
-net_test = NetworkTest()
-parsers = Parsers()
-pcap = PacketCapture()
-log_alert = LogAlert()
-action_map: dict[str, Callable[[dict], object]] = {
-    "trcrt_dns": net_test.dnstraceroute,
-    "trcrt": net_test.traceroute,
-    "perf_srvr": net_test.iperf_server,
-    "perf_clnt": net_test.iperf_client,
-    "scan_arp": net_discovery.arp_scan,
-    "scan_custom": net_discovery.custom_scan,
-    "scan_dev_id": net_discovery.device_identification_scan,
-    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
-    "scan_full": net_discovery.full_network_scan,
-    "scan_snmp": net_discovery.snmp_scans,
-    "scan_port": net_discovery.port_scan,
-    "pcap_lcl": pcap.pcap_local,
-    "pcap_tux": pcap.pcap_remote_linux,
-    "pcap_win": pcap.pcap_remote_windows
-}
-
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
 
 mcp_app = mcp.http_app(path="/mcp")
@@ -138,7 +105,7 @@ async def init(init_data: InitCall):
         if resp_data.status_code == 200:
             access_token = resp_data.cookies.get("access_token")
             logger.info(access_token)
-            await resp_data.aclose()
+            #await resp_data.aclose()
 
             enroll_rqst = await _make_http_request(
                 cmd="p",
@@ -147,10 +114,8 @@ async def init(init_data: InitCall):
                 cookies=access_token,
                 payload=payload,
             )
-            await enroll_rqst.aclose()
+            #await enroll_rqst.aclose()
             return 200 if enroll_rqst.status_code == 200 else 400
-        else:
-            await resp_data.aclose()
 
         return None
     
@@ -174,7 +139,9 @@ async def init(init_data: InitCall):
                           'site': init_data.umj_site,
                           'name': init_data.prb_name,
                           'assigned_user': init_data.umj_usr,
-                          'umj_url': init_data.umj_url
+                          'umj_url': init_data.umj_url,
+                          'umj_api_key': init_data.umj_api_key,
+
                           }
 
         if await prb_db.upload_db_data(id=probe_id, data=umj_probe_data) > 0:
