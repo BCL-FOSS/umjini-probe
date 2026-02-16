@@ -354,6 +354,7 @@ class CoreClient:
                                         'site': probe_obj.get('site'),
                                         'task_output': result,
                                         'prb_id': probe_obj.get('prb_id'),
+                                        'assigned_user': probe_obj.get('assigned_user'),
                                         'name': exec_name,
                                         'prb_name': probe_obj.get('name'),
                                         'task_type': f'{core_act_data["task"]}',
