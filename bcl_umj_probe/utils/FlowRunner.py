@@ -1,3 +1,4 @@
+import datetime
 import logging
 import ast
 import json
@@ -6,6 +7,7 @@ import os
 import uuid
 from init_app import action_map, net_discovery, net_test, pcap, probe_util, log_alert, parsers, cron, slack_alert, jira_alert, email_alert, bot_connection
 from utils.RedisDB import RedisDB
+from datetime import datetime, timezone
 
 class FlowRunner:
     def __init__(self):
@@ -33,27 +35,14 @@ class FlowRunner:
         self.logger.info(workflow_data)
 
         node_output_mapping = {}
-        node_input_mapping = {}
+        alerts = {}
+        agents = {}
         remote_tools_to_execute = {}
         local_tools_to_execute = {}
                 
         for node_id, node in workflow_data.items():
             node_data = node.get('data')
-            inputs = node.get('inputs')
-            outputs = node.get('outputs')
             remote_tool_params = {}
-
-            if outputs != {}:
-                for key, value in outputs.items():
-                    if value.get('connections') != []:
-                        for connection in value.get('connections'):
-                            node_output_mapping[node_id] = {'output': connection['node']}
-
-            if inputs != {}:
-                for key, value in inputs.items():
-                    if value.get('connections') != []:
-                        for connection in value.get('connections'):
-                            node_input_mapping[node_id] = {'input': connection['node']}
 
             match node_data['name']:
                 case str() as s if s.startswith('prb:'):
@@ -136,8 +125,7 @@ class FlowRunner:
                         params['subnet'] = probe_util.get_interface_subnet(node_data['arp-interface'])['network']
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'scan_custom':
                     params = {}
@@ -148,8 +136,7 @@ class FlowRunner:
                         params['options'] = node_data['custom-options']
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'scan_dev_id':
                     if node_data['devid-target']:
@@ -159,8 +146,7 @@ class FlowRunner:
                         params['noise'] = True
                   
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'scan_dev_fngr':
                     if node_data['devfngr-target']:
@@ -170,8 +156,7 @@ class FlowRunner:
                         params['limit'] = False
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'scan_full':
                     params = {}
@@ -179,8 +164,7 @@ class FlowRunner:
                         params['subnet'] = node_data['full-target']
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'scan_snmp':
                     params = {}
@@ -193,9 +177,8 @@ class FlowRunner:
                     if node_data['snmp-snmpscanscripts']:
                         params['scripts'] = node_data['snmp-snmpscanscripts']
 
-                    handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    handler = action_map.get(node_data['name'])     
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'scan_port':
                     params = {}
@@ -206,8 +189,7 @@ class FlowRunner:
                         params['ports'] = node_data['port-options']
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'test_srvr':
                     params = {}
@@ -218,8 +200,7 @@ class FlowRunner:
                         params['host'] = node_data['perfs-bind']
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'test_clnt':
                     params = {}
@@ -232,9 +213,8 @@ class FlowRunner:
                     if node_data['perfc-bind']:
                         params['host'] = node_data['perfc-bind']
 
-                    handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    handler = action_map.get(node_data['name']) 
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'trcrt':
                     params = {}
@@ -248,8 +228,7 @@ class FlowRunner:
                         params['packetlen'] = node_data['trcrt-pktlen']
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'trcrt_dns':
                     params = {}
@@ -263,8 +242,7 @@ class FlowRunner:
                         params['server'] = node_data['tracrtdns-server']
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'pcap_lcl':
                     params = {}
@@ -275,8 +253,7 @@ class FlowRunner:
                         params['cap_count'] = node_data['pcaplcl-count']
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
               
                 case 'pcap_win' | 'pcap_tux':
                     params = {}
@@ -299,37 +276,21 @@ class FlowRunner:
                         params['cap_count'] = node_data['pcaprm-count']
 
                     handler = action_map.get(node_data['name'])
-                    if node_output_mapping[node_id] and node_id in node_output_mapping:
-                        local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
 
                 case 'slack':
-                    slack_alert.set_slack_connection_info(slack_bot_token=os.environ.get('slack-token'), slack_channel_id=os.environ.get('slack-channel'))
-                    if node_input_mapping[node_id] and node_id in node_input_mapping:
-                        node_input_mapping[node_id]['tool'] = node_data['name']
+                    alerts['tool'] = node_data['name']
 
                 case 'jira':
-                    jira_alert.set_jira_connection_info(cloud_id=os.environ.get('jira-cloud-id'), auth_email=os.environ.get('jira-auth-email'), auth_token=os.environ.get('jira-auth-token'))
-                    if node_input_mapping[node_id] and node_id in node_input_mapping:
-                        node_input_mapping[node_id]['tool'] = node_data['name']
+                    alerts['tool'] = node_data['name']
                  
                 case 'email':
-                    email_alert.set_brevo_api_key(os.environ.get('brevo-api-key'))
-                    if node_input_mapping[node_id] and node_id in node_input_mapping:
-                        node_input_mapping[node_id]['tool'] = node_data['name']
+                    alerts['tool'] = node_data['name']
 
-                case 'smartbot' | 'flowbot':
-                    if node_input_mapping[node_id] and node_id in node_input_mapping:
-                        params = {'payload': {'prompt': node_data['bot-prompt'],
-                                              'name': node_data['bot-name'],
-                                              'prb_id': node_data['name'],
-                                              'usr': probe_data_dict.get('assigned_user')
-                                              },
-                                'url': f'https://{probe_data_dict.get("url")}',
-                                'headers': {'content-type': 'application/json',
-                                            'X-UMJ-WFLW-API-KEY': probe_data_dict.get('umj_api_key')}}
-                        node_input_mapping[node_id]['tool'] = node_data['name']
-                        node_input_mapping[node_id]['prms'] = params
-        
+                case 'smartbot':
+                    if node_data['bot-prompt']:
+                        agents['prompt'] = node_data['bot-prompt']
+                        agents['agent'] = node_data['name']
 
         if local_tools_to_execute != {}:
             for node_id, tool_info in local_tools_to_execute.items():
@@ -337,40 +298,40 @@ class FlowRunner:
                 params = tool_info['arguments']
                 result = await handler(**params)
                 node_output_mapping[node_id]['result'] = result
+                node_output_mapping[node_id]['tool'] = handler
+                node_output_mapping[node_id]['prb'] = probe_data_dict.get('name')
+
+                timestamp = datetime.now(tz=timezone.utc).isoformat()
+                await log_alert.write_log(log_name=f"{handler}_result_{timestamp}", message=result)
 
         if remote_tools_to_execute != {}:
             for node_id, tool_info in remote_tools_to_execute.items():
                 headers = {'content-type': 'application/json',
                            'X-UMJ-WFLW-API-KEY': probe_data_dict.get('umj_api_key')}
                 
-                url = f"https://{probe_data_dict.get('umj_url')}/v1/api/core/probes/{tool_info['prb']}/exec?usr={probe_data_dict.get('assigned_user')}"
-                async with httpx.AsyncClient() as client:
-                    payload = {
-                        'name': tool_info['name'],
-                        'arguments': tool_info['arguments'],
-                        'prb_id': tool_info['prb']
-                    }
-                                    
-                    mcp_run = await client.post(url=url, json=payload, headers=headers, timeout=int(os.environ.get('REQUEST_TIMEOUT')))
+                handler = action_map.get('bot')
 
-                    if mcp_run.status_code == 200:
-                        mcp_tool_data = await mcp_run.json()
-                        if node_id in node_output_mapping and node_output_mapping[node_id]:
-                            node_output_mapping[node_id]['result'] = mcp_tool_data['output']
-                            node_output_mapping[node_id]['prb'] = remote_tools_to_execute[node_id]['prb']
+                bot_data = {'url': probe_data_dict.get('umj_url'), 
+                            'headers': headers,
+                            'prb': tool_info['prb'],
+                            'usr': probe_data_dict.get('assigned_user'),
+                            'payload': {
+                                    'name': tool_info['name'],
+                                    'arguments': tool_info['arguments'],
+                                    'prb_id': tool_info['prb'],
+                                }
+                            }
+                
+                mcp_run = await handler(**bot_data)
 
-        for node_id, node_tool_data in node_output_mapping.items():
-            output_id = node_tool_data['output']
-            if node_input_mapping.get(output_id) and node_input_mapping[output_id].get('tool'):
-                handler = action_map.get(node_input_mapping[output_id]['tool'])
-                if handler == 'smartbot' or handler == 'flowbot':
-                    params = node_input_mapping[output_id]['prms']
-                    params['tool_call_data'] = node_tool_data
-                    params['payload']['result'] = node_tool_data['result']
-                    await handler(**params)
-                result = node_tool_data['result']
-                params = {'message': result}
-                await handler(**params) 
+                if mcp_run.status_code == 200:
+                    mcp_tool_data = mcp_run.json()
+                    if node_id in node_output_mapping and node_output_mapping[node_id]:
+                        node_output_mapping[node_id]['result'] = mcp_tool_data['output']
+                        node_output_mapping[node_id]['prb'] = remote_tools_to_execute[node_id]['prb']
+                        node_output_mapping[node_id]['tool'] = bot_data['payload']['name']
+
+        return node_output_mapping, alerts, agents
 
                 
 

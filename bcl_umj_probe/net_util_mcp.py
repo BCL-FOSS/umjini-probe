@@ -60,6 +60,16 @@ def verify_api(headers: dict[str, str]) -> None:
 
 mcp = FastMCP(name="umjiniti-probe: network management utility")
 
+async def save_log_and_return(code: int, output: str, error: str, log_name: str) -> tuple[int, str, str]:
+    log_message=f""
+    log_message+=f"{code}\n\n"
+    log_message+=f"{output}\n\n"
+    log_message+=f"{error}"
+
+    await log_alert.write_log(log_name=log_name, message=log_message)
+
+    return code, output, error
+
 @mcp.tool
 async def speedtest_server(options: Annotated[str, "Additional command line flags to add to the iperf3 command."] = None, host: Annotated[str, "The IP address of the incoming interface the iperf server binds to. Defaults to 0.0.0.0 to bind to all available interfaces. This should be set for multihomed umjiniti probes."] = None):
     """Runs speedtest server which performs active measurements of the maximum achievable bandwidth on the specified IP network (host). Supports tuning of various parameters related to timing, buffers and protocols (TCP, UDP, SCTP with IPv4 and IPv6) via the command line flag options provided by the user. For each test it reports the bandwidth, loss, and other parameters."""
@@ -69,26 +79,18 @@ async def speedtest_server(options: Annotated[str, "Additional command line flag
 
     if options and host is not None or ''.strip():
         code, output, error = await net_test.iperf_server(options=options, host=host)
-        return code, output, error
+        return await save_log_and_return(code, output, error, log_name=f"speedtest_srvr_result")
     
     if options is not None or ''.strip():
         code, output, error = await net_test.iperf_server(options=options)
-        return code, output, error
+        return await save_log_and_return(code, output, error, log_name=f"speedtest_srvr_result")
     
     if host is not None or ''.strip():
         code, output, error = await net_test.iperf_server(host=host)
-        return code, output, error
+        return await save_log_and_return(code, output, error, log_name=f"speedtest_srvr_result")
     
     code, output, error = await net_test.iperf_server()
-
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"speedtest_srvr_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"speedtest_srvr_result")
 
 @mcp.tool
 async def speedtest_client(server: Annotated[str, "The speedtest server the client connects to."], options: Annotated[str, "Additional command line flags to add to the iperf3 command."] = None, host: Annotated[str, "The IP address of the incoming interface the iperf client binds to. Defaults to 0.0.0.0 to bind to all available interfaces. This should be set for multihomed umjiniti probes."] = None):
@@ -99,26 +101,18 @@ async def speedtest_client(server: Annotated[str, "The speedtest server the clie
 
     if options and host is not None or ''.strip():
         code, output, error = await net_test.iperf_client(server=server, options=options, host=host)
-        return code, output, error
+        return await save_log_and_return(code, output, error, log_name=f"speedtest_client_result")
     
     if options is not None or ''.strip():
         code, output, error = await net_test.iperf_client(server=server, options=options)
-        return code, output, error
+        return await save_log_and_return(code, output, error, log_name=f"speedtest_client_result")
     
     if host is not None or ''.strip():
         code, output, error = await net_test.iperf_client(server=server, host=host)
-        return code, output, error
+        return await save_log_and_return(code, output, error, log_name=f"speedtest_client_result")
     
     code, output, error = await net_test.iperf_server()
-
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"speedtest_client_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"speedtest_client_result")
 
 @mcp.tool
 async def traceroute(target: Annotated[str, "The server or endpoint to trace."], options: Annotated[str, "Additional command line flags to add to the traceroute command"] = None, packetlength: Annotated[str, "Sets the total size of the probing packet"] = None):
@@ -131,27 +125,19 @@ async def traceroute(target: Annotated[str, "The server or endpoint to trace."],
 
     if options and packetlength is not None or ''.strip():
        code, output, error = await net_test.traceroute(target=target, options=options, packetlen=packetlength)
-       return code, output, error
+       return await save_log_and_return(code, output, error, log_name=f"traceroute_result")
 
     if options is not None or ''.strip():
        code, output, error = await net_test.traceroute(target=target, options=options)
-       return code, output, error
+       return await save_log_and_return(code, output, error, log_name=f"traceroute_result")
 
     if packetlength is not None or ''.strip():
         code, output, error = await net_test.traceroute(target=target, packetlen=packetlength)
-        return code, output, error
+        return await save_log_and_return(code, output, error, log_name=f"traceroute_result")
 
     code, output, error = await net_test.traceroute(target=target)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-    logger.info(log_message)
-
-    await log_alert.write_log(log_name=f"traceroute_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"traceroute_result")
 
 @mcp.tool
 async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace."], options: Annotated[str, "Additional command line flags to add to the dnstraceroute command"] = None, server: Annotated[str, "The DNS server to use for the traceroute. Defaults to 8.8.8.8 (google DNS server)"] = None):
@@ -164,26 +150,19 @@ async def traceroute_dns(target: Annotated[str, "The server or endpoint to trace
 
     if options and server is not None or ''.strip():
        code, output, error = await net_test.dnstraceroute(target=target, options=options, server=server)
-       return code, output, error
+       return await save_log_and_return(code, output, error, log_name=f"dns_traceroute_result")
 
     if options is not None or ''.strip():
        code, output, error = await net_test.dnstraceroute(target=target, options=options)
-       return code, output, error
+       return await save_log_and_return(code, output, error, log_name=f"dns_traceroute_result")
     
     if server is not None or ''.strip():
        code, output, error = await net_test.dnstraceroute(target=target, server=server)
-       return code, output, error
+       return await save_log_and_return(code, output, error, log_name=f"dns_traceroute_result")
 
     code, output, error = await net_test.dnstraceroute(target=target)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"dns_traceroute_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"dns_traceroute_result")
 
 @mcp.tool
 async def arp_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
@@ -201,14 +180,7 @@ async def arp_scan(interface: Annotated[str, "The physical network interface por
 
     code, output, error = await net_discovery.arp_scan(subnet=network)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"arp_scan_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"arp_scan_result")
 
 @mcp.tool
 async def device_identifcation_scan(enable_os_detection: Annotated[bool, "Enables OS detection + service identification scan. Service identification is enabled by default (the variable is set to False by default). If OS detection is requested, set this variable to True."] = False, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."] = None):
@@ -235,14 +207,7 @@ async def device_identifcation_scan(enable_os_detection: Annotated[bool, "Enable
     else:
         code, output, error = await net_discovery.device_identification_scan(subnet=network)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"device_id_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"device_id_result")
 
 @mcp.tool
 async def snmp_scan(type: Annotated[str, "Determines the type of SNMP scan used. To identify if SNMP is active on the specified target, set variable to 'snmp_opn'. If SNMP scripts to run on specified target are provided, set variable to 'snmp_enum'. To retrieve all available SNMP information from the specified target, set variable to 'snmp_all'."] = None, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."] = None, scripts: Annotated[str, "The nmap SNMP scan scripts to run. Defaults scripts retrieve system decriptions and system network interface data."] = None):
@@ -269,15 +234,7 @@ async def snmp_scan(type: Annotated[str, "Determines the type of SNMP scan used.
     else:
         code, output, error = await net_discovery.snmp_scans(subnet=network, type=type)
 
-
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"{type}_scan_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"{type}_scan_result")
 
 @mcp.tool
 async def device_fingerprint_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The network device IP or hostname to run the scan on."] = None, limit: Annotated[bool, "Enable more aggresive OS detection or limited OS detection. If aggresive OS identification is specified, set variable to False"] = True):
@@ -297,15 +254,8 @@ async def device_fingerprint_scan(interface: Annotated[str, "The physical networ
         code, output, error = await net_discovery.device_fingerprint_scan(subnet=target, limit=limit)
     else:
         code, output, error = await net_discovery.device_fingerprint_scan(subnet=network, limit=limit)
-  
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
 
-    await log_alert.write_log(log_name=f"device_fingerprint_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"device_fingerprint_result")
 
 @mcp.tool
 async def port_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The network device IP or hostname to run the scan on."] = None, ports: Annotated[str, "The ports to scan for on the specified target. The specified ports should be in the following format: 'port1,port2,port3,port4...'"] = None):
@@ -333,14 +283,7 @@ async def port_scan(interface: Annotated[str, "The physical network interface po
     else:
         code, output, error = await net_discovery.port_scan(subnet=network)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"deviceid_result")
 
 @mcp.tool
 async def custom_scan( options: Annotated[str, "The nmap scan options to run."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The network device IP or hostname to run the scan on."] = None):
@@ -362,14 +305,7 @@ async def custom_scan( options: Annotated[str, "The nmap scan options to run."],
     if options is not None:
         code, output, error = await net_discovery.custom_scan(subnet=network, options=options)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"custom_scan_result")
 
 @mcp.tool
 async def full_scan(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
@@ -387,14 +323,7 @@ async def full_scan(interface: Annotated[str, "The physical network interface po
 
     code, output, error = await net_discovery.full_network_scan(subnet=network)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"full_scan_result")
 
 @mcp.tool
 async def pcap_local(interface: Annotated[str, "The physical network interface port the packet capture will run on. Defaults to the primary interface on the host."] = None, cap_count: Annotated[int, "The number of packets to capture. Default is set to 50."] = None):
@@ -417,14 +346,7 @@ async def pcap_local(interface: Annotated[str, "The physical network interface p
     if cap_count is None and interface is None:
         code, output, error = await pcap.pcap_local(interface=iface)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"pcap_local_result")
 
 @mcp.tool
 async def pcap_remote_linux(remote_interface: Annotated[str, "The physical network interface port of the remote linux host the packet capture will run on."], host: Annotated[str, "the remote linux host the packet capture will run on."], username: Annotated[str, "The username of a sudo level user of the remote linux host."], password: Annotated[str, "The password of the sudo level user on the remote linux host."], cap_count: Annotated[int, "The number of packets to capture. Default is set to 50."] = None):
@@ -442,14 +364,7 @@ async def pcap_remote_linux(remote_interface: Annotated[str, "The physical netwo
     else:
         code, output, error = await pcap.pcap_remote_linux(remote_iface=remote_interface)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"deviceid_result")
 
 @mcp.tool
 async def pcap_remote_windows(remote_interface: Annotated[str, "The physical network interface port of the remote windows server host the packet capture will run on."], host: Annotated[str, "the remote windows server host the packet capture will run on."], username: Annotated[str, "The username of an admin level user of the remote linux host."], password: Annotated[str, "The password of an admin level user on the remote linux host."], duration: Annotated[int, "The number of seconds the packet capture will run on the windows server host."] = None):
@@ -467,14 +382,7 @@ async def pcap_remote_windows(remote_interface: Annotated[str, "The physical net
     else:
         code, output, error = await pcap.pcap_remote_linux(remote_iface=remote_interface)
 
-    log_message=f""
-    log_message+=f"{code}\n\n"
-    log_message+=f"{output}\n\n"
-    log_message+=f"{error}"
-
-    await log_alert.write_log(log_name=f"deviceid_result", message=log_message)
-
-    return code, output, error
+    return await save_log_and_return(code, output, error, log_name=f"deviceid_result")
 
 
 

@@ -1,0 +1,41 @@
+# Use the official Kali Linux rolling image as the base
+FROM kalilinux/kali-rolling:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN adduser quart --disabled-password 
+
+RUN apt update -y && apt install -y \
+    kali-linux-headless \
+    kali-tools-vulnerability \
+    kali-tools-windows-resources \
+    kali-tools-information-gathering \
+    --no-install-recommends
+
+RUN apt-get install -y \
+    tshark \
+    tcpdump \
+    iputils-ping \
+    iperf3 \
+    libpcap-dev \
+    traceroute \
+    sshpass \
+    dnsdiag
+
+# Clean up apt lists to reduce image size
+RUN rm -rf /var/lib/apt/lists/*
+
+WORKDIR /home/quart
+
+RUN mkdir /home/quart/probedata
+RUN mkdir /home/quart/probedata/pcaps
+
+COPY bcl_umj_probe/requirements.txt ./
+
+RUN pip install --no-cache-dir -r requirements.txt --upgrade 
+
+COPY bcl_umj_probe/ /home/quart/
+
+RUN chmod +x boot.sh
+
+ENTRYPOINT ["sh", "./boot.sh"]

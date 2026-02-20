@@ -13,7 +13,7 @@ from utils.network_utils.PacketCapture import PacketCapture
 from utils.alerts_utils.SlackAlert import SlackAlert
 from utils.alerts_utils.JiraSM import JiraSM
 from utils.alerts_utils.EmailSenderHandler import EmailSenderHandler
-from utils.alerts_utils.alert_base.BotConnection import BotConnection
+from utils.alerts_utils.BotConnection import BotConnection
 import logging
 from crontab import CronTab
 from utils.alerts_utils.LogAlert import LogAlert
@@ -56,7 +56,7 @@ action_map: dict[str, Callable[[dict], object]] = {
     "pcap_win": pcap.pcap_remote_windows,
     "slack": slack_alert.send_alert_message,
     "jira": jira_alert.send_alert,
-    "bot": bot_connection.send_bot_message,
+    "bot": bot_connection.mcp_exec,
     "email": email_alert.send_transactional_email,
 
 }

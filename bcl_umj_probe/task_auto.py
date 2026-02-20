@@ -16,10 +16,11 @@ logger = logging.getLogger(__name__)
 
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 
-async def automate_task(action: str, params: str, ws_url: str, probe_data: str, task_name: str):
+async def automate_task(action: str, params: str, ws_url: str, probe_data: str, task_name: str, llm: str = None, llm_data: str = None, alert_type: dict = None):
     async with connect(uri=ws_url) as websocket:
         params_dict = json.loads(params)
         probe_data_dict = json.loads(probe_data)
+        smartbot_data = json.loads(llm_data) if llm_data is not None else None
 
         if action == 'pcap_tux' or action == 'pcap_win':
             pcap.set_host(host=params_dict['host'])
@@ -103,9 +104,50 @@ async def automate_task(action: str, params: str, ws_url: str, probe_data: str, 
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "packets": packets
                     }
-            task_result = {
+
+        if llm == 'smartbot' and smartbot_data is not None:
+            smartbot_call = {
+                 'act': 'smartbot_task',
+                 'url': f"{probe_data_dict.get('url')}/llm/mcp",
+                 'tool_output': result,
+                 'task_type': action,
+                 'prompt': smartbot_data.get('prompt'),
+                 'prb_api_key': probe_data_dict.get('prb_api_key'),
+                 'prb_id': probe_data_dict.get('prb_id'),
+                 'prb_name': probe_data_dict.get('name'),
+                 'site': probe_data_dict.get('site'),
+                 'alerts': {'tool': smartbot_data.get('alerts')}
+            }
+                
+            await websocket.send(json.dumps(smartbot_call))
+
+        if alert_type is not None:
+            match alert_type.get('type'):
+                case 'slack':
+                    slack_alert.set_slack_connection_info(slack_bot_token=os.environ.get('slack-token'), slack_channel_id=os.environ.get('slack-channel'))
+                case 'jira':
+                    jira_alert.set_jira_connection_info(cloud_id=os.environ.get('jira-cloud-id'), auth_email=os.environ.get('jira-auth-email'), auth_token=os.environ.get('jira-auth-token'))
+                case 'email' | _:
+                    email_alert.set_brevo_api_key(os.environ.get('brevo-api-key'))
+                    html_snippet = f"""<div style="font-family: Arial, sans-serif; color: #111; line-height: 1.5;">
+                        <p>Task Alert</p>
+                        <p>Probe: {probe_data_dict.get('name')}</p>
+                        <p>Site: {probe_data_dict.get('site')}</p>
+                        <p>Action: {action}</p>
+                        <p>Result: {output}</p>
+                        </div>"""
+                    send_result = asyncio.to_thread(
+                        email_alert.send_transactional_email, 
+                        sender={'name': f'Probe: {probe_data_dict.get("name")}', 'email': os.environ.get('BREVO_SENDER_EMAIL')},
+                        to=[{"name": os.environ.get('BREVO_RECIPIENT_NAME'), "email": os.environ.get('BREVO_RECIPIENT_EMAIL')}],
+                        subject=f"Task Alert: {action} executed on probe {probe_data_dict.get('name')}",
+                        html_content=html_snippet
+                        )
+                    logger.info(type(send_result))
+
+        task_result = {
                 'site': probe_data_dict['site'],
-                'task_output': result,
+                'task_output': output,
                 'prb_id': probe_data_dict['prb_id'],
                 'prb_name': probe_data_dict['name'],
                 'assigned_user': probe_data_dict['assigned_user'],
@@ -113,13 +155,9 @@ async def automate_task(action: str, params: str, ws_url: str, probe_data: str, 
                 'timestamp': datetime.now(tz=timezone.utc).isoformat(),
                 'act': "prb_task_rslt",
                 'name': task_name,
-                'llm': params_dict['llm']
                                     }
             
-            await websocket.send(json.dumps(task_result))
-        else:
-            logger.error(f"Action '{action}' not found in action map.")
-            return None
+        await websocket.send(json.dumps(task_result))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Automate network monitoring tasks.")
@@ -139,22 +177,6 @@ if __name__ == "__main__":
         help="WebSocket URL for reporting results"
     )
     parser.add_argument(
-        '-pid', '--prb_id', 
-        type=str, 
-        help="Probe " \
-        "ID for reporting results"
-    )
-    parser.add_argument(
-        '-s', '--site', 
-        type=str, 
-        help="Site for reporting results"
-    )
-    parser.add_argument(
-        '-llm', '--llmanalysis', 
-        action='store_true', 
-        help="Enable debug logging"
-    )
-    parser.add_argument(
         '-pdta', '--probe_data', 
         type=dict, 
         help="Probe data for reporting results"
@@ -166,4 +188,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, site=args.site, llm=args.llmanalysis, probe_data=args.probe_data, name=args.name))
+    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, probe_data=args.probe_data, task_name=args.name))

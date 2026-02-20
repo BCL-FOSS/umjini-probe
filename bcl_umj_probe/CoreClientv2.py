@@ -23,7 +23,8 @@ from utils.alerts_utils.LogAlert import LogAlert
 import xmltodict
 from datetime import datetime, timedelta, timezone
 from utils.Parsers import Parsers
-from init_app import action_map, net_discovery, net_test, pcap, probe_util, log_alert, parsers, cron
+from init_app import action_map, pcap, log_alert, parsers, net_discovery, net_test, slack_alert, jira_alert, email_alert, bot_connection, probe_util, cron
+
 
 class CoreClient:
     def __init__(self, umj_ws_url: str):
@@ -100,14 +101,22 @@ class CoreClient:
                 if probe_id and probe_id == probe_obj.get('prb_id'):
                     match core_act_data['oper']:
                         case 'init_task':
-                            if 'prms' in core_act_data and core_act_data['prms']:
-                                params = core_act_data['prms']
 
-                            ws_url = f"wss://{probe_obj.get('umj_url')}/heartbeat/{probe_obj.get('prb_id')}"
+                            job1 = None
+                            ws_url = f"wss://{probe_obj.get('umj_url')}/v1/api/core/channels/probe/heartbeat/{probe_obj.get('prb_id')}"
                             cwd = os.getcwd()
-                            script_path = os.path.join(cwd, 'task_auto.py')
-                            job_comment=f"auto_task_{probe_obj.get('prb_id')}_{core_act_data['task']}"
-                            job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pid {probe_obj.get('prb_id')} -s {probe_obj.get('site')} -llm {core_act_data['llm_analysis']} -pdta '{json.dumps(probe_obj)}' -n {job_comment}", comment=job_comment)
+
+                            if core_act_data['auto_type'] == 'task':
+                                if 'prms' in core_act_data and core_act_data['prms']:
+                                    params = core_act_data['prms']
+                                script_path = os.path.join(cwd, 'task_auto.py')
+                                job_comment=f"auto_task_{probe_obj.get('prb_id')}_task_{core_act_data['task']}"
+                                job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {job_comment}", comment=job_comment)
+
+                            if core_act_data['auto_type'] == 'flow':
+                                script_path = os.path.join(cwd, 'flow_auto.py')
+                                job_comment=f"auto_task_{probe_obj.get('prb_id')}_flow_{core_act_data['flow_id']}"
+                                job1=cron.new(command=f"python3 {script_path} -f {core_act_data['flow']} -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {core_act_data['flow_name']}", comment=job_comment)
 
                             if 'minutes' in core_act_data and core_act_data['minutes']:
                                     minutes_range = str(core_act_data['minutes']).split(",")
@@ -160,11 +169,11 @@ class CoreClient:
                                     self.logger.info(f"Cron job added: {job1}")
                                     await ws.send(json.dumps({
                                         'site': probe_obj.get('site'),
-                                        'task_output': f"Cron job added for task {core_act_data['task']}.",
+                                        'task_output': f"{core_act_data['auto_type']} cron job added to {probe_obj.get('name')} at site: {probe_obj.get('site')}.",
                                         'prb_id': probe_obj.get('prb_id'),
                                         'prb_name': probe_obj.get('name'),
-                                        'task_type': f'{core_act_data['task']}',
-                                        'name': f'cron_job_{core_act_data['task']}',
+                                        'job_type': f'{core_act_data['auto_type']}',
+                                        'job_name': f'cron_job_{job_comment}',
                                         'act': "prb_task_cnfrm",
                                         'comment': job_comment,
                                         'enabled': 'enabled',
@@ -360,9 +369,50 @@ class CoreClient:
                                         'task_type': f'{core_act_data["task"]}',
                                         'timestamp': datetime.now(tz=timezone.utc).isoformat(),
                                         'act': "prb_task_rslt",
-                                        'llm': core_act_data['llm']
                                     }
                                 await ws.send(json.dumps(task_result))
+
+                        case 'alert':
+                            if core_act_data['alerts']['tool'] == 'slack':
+                                slack_alert.set_slack_connection_info(slack_bot_token=os.environ.get('slack-token'), slack_channel_id=os.environ.get('slack-channel'))
+
+                            if core_act_data['alerts']['tool'] == 'jira':
+                                jira_alert.set_jira_connection_info(cloud_id=os.environ.get('jira-cloud-id'), auth_email=os.environ.get('jira-auth-email'), auth_token=os.environ.get('jira-auth-token'))
+
+                            if core_act_data['alerts']['tool'] == 'email':
+                                email_alert.set_brevo_api_key(os.environ.get('brevo-api-key'))
+                                html_snippet = f"""<div style="font-family: Arial, sans-serif; color: #111; line-height: 1.5;">
+                                    <p>Task Alert</p>
+                                    <p>Probe: {probe_obj.get('name')}</p>
+                                    <p>Site: {probe_obj.get('site')}</p>
+                                    <p>Action: {core_act_data['task_type']}</p>
+                                    <p>Result: {core_act_data['llm_output']}</p>
+                                    </div>"""
+                                send_result = asyncio.to_thread(
+                                    email_alert.send_transactional_email, 
+                                    sender={'name': f'Probe: {probe_obj.get("name")}', 'email': os.environ.get('BREVO_SENDER_EMAIL')},
+                                    to=[{"name": os.environ.get('BREVO_RECIPIENT_NAME'), "email": os.environ.get('BREVO_RECIPIENT_EMAIL')}],
+                                    subject=f"Task Alert: {core_act_data['task_type']} executed on probe {probe_obj.get('name')}",
+                                    html_content=html_snippet
+                                    )
+                                self.logger.info(type(send_result))
+
+                            task_name = f"alert_{core_act_data['flow_name']}_{datetime.now(tz=timezone.utc).isoformat()}" if 'flow_name' in core_act_data else f"alert_{core_act_data['task_type']}_{datetime.now(tz=timezone.utc).isoformat()}"
+
+                            task_result = {
+                                        'site': probe_obj.get('site'),
+                                        'task_output': core_act_data['llm_output'],
+                                        'prb_id': probe_obj.get('prb_id'),
+                                        'assigned_user': probe_obj.get('assigned_user'),
+                                        'name': task_name,
+                                        'prb_name': probe_obj.get('name'),
+                                        'task_type': f'{core_act_data["task"]}',
+                                        'timestamp': datetime.now(tz=timezone.utc).isoformat(),
+                                        'act': "prb_task_rslt",
+                                    }
+                            await ws.send(json.dumps(task_result))
+
+                            
                         case _:
                             self.logger.warning(f"Unknown operation received: {core_act_data['oper']}")
 
