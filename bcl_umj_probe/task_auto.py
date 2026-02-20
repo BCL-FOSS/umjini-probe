@@ -16,11 +16,12 @@ logger = logging.getLogger(__name__)
 
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 
-async def automate_task(action: str, params: str, ws_url: str, probe_data: str, task_name: str, llm: str = None, llm_data: str = None, alert_type: dict = None):
+async def automate_task(action: str, params: str, ws_url: str, probe_data: str, task_name: str, llm: str = None, llm_data: str = None, alert_type: str = None):
     async with connect(uri=ws_url) as websocket:
         params_dict = json.loads(params)
         probe_data_dict = json.loads(probe_data)
         smartbot_data = json.loads(llm_data) if llm_data is not None else None
+        alert_data = json.loads(alert_type) if alert_type is not None else None
 
         if action == 'pcap_tux' or action == 'pcap_win':
             pcap.set_host(host=params_dict['host'])
@@ -121,29 +122,29 @@ async def automate_task(action: str, params: str, ws_url: str, probe_data: str, 
                 
             await websocket.send(json.dumps(smartbot_call))
 
-        if alert_type is not None:
-            match alert_type.get('type'):
-                case 'slack':
-                    slack_alert.set_slack_connection_info(slack_bot_token=os.environ.get('slack-token'), slack_channel_id=os.environ.get('slack-channel'))
-                case 'jira':
-                    jira_alert.set_jira_connection_info(cloud_id=os.environ.get('jira-cloud-id'), auth_email=os.environ.get('jira-auth-email'), auth_token=os.environ.get('jira-auth-token'))
-                case 'email' | _:
-                    email_alert.set_brevo_api_key(os.environ.get('brevo-api-key'))
-                    html_snippet = f"""<div style="font-family: Arial, sans-serif; color: #111; line-height: 1.5;">
+        alert_data = json.loads(alert_type)
+        match alert_data.get('type'):
+            case 'slack':
+                slack_alert.set_slack_connection_info(slack_bot_token=os.environ.get('slack-token'), slack_channel_id=os.environ.get('slack-channel'))
+            case 'jira':
+                jira_alert.set_jira_connection_info(cloud_id=os.environ.get('jira-cloud-id'), auth_email=os.environ.get('jira-auth-email'), auth_token=os.environ.get('jira-auth-token'))
+            case 'email' | _:
+                email_alert.set_brevo_api_key(os.environ.get('brevo-api-key'))
+                html_snippet = f"""<div style="font-family: Arial, sans-serif; color: #111; line-height: 1.5;">
                         <p>Task Alert</p>
                         <p>Probe: {probe_data_dict.get('name')}</p>
                         <p>Site: {probe_data_dict.get('site')}</p>
                         <p>Action: {action}</p>
                         <p>Result: {output}</p>
                         </div>"""
-                    send_result = asyncio.to_thread(
+                send_result = asyncio.to_thread(
                         email_alert.send_transactional_email, 
                         sender={'name': f'Probe: {probe_data_dict.get("name")}', 'email': os.environ.get('BREVO_SENDER_EMAIL')},
                         to=[{"name": os.environ.get('BREVO_RECIPIENT_NAME'), "email": os.environ.get('BREVO_RECIPIENT_EMAIL')}],
                         subject=f"Task Alert: {action} executed on probe {probe_data_dict.get('name')}",
                         html_content=html_snippet
                         )
-                    logger.info(type(send_result))
+                logger.info(type(send_result))
 
         task_result = {
                 'site': probe_data_dict['site'],
@@ -168,7 +169,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         '-p', '--params', 
-        type=dict, 
+        type=str, 
         help="params_dict for the network task"
     )
     parser.add_argument(
@@ -178,7 +179,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         '-pdta', '--probe_data', 
-        type=dict, 
+        type=str, 
         help="Probe data for reporting results"
     )
     parser.add_argument(
@@ -186,6 +187,21 @@ if __name__ == "__main__":
         type=str, 
         help="Name for reporting results"
     )
+    parser.add_argument(
+        '-llm', '--smartbot', 
+        type=str, 
+        help="Whether to send results to smartbot for further analysis and alerting"
+    )
+    parser.add_argument(
+        '-llmdta', '--llm_data', 
+        type=str, 
+        help="Data for smartbot to determine alerts and analysis (e.g., prompt, alert preferences)"
+    )
+    parser.add_argument(
+        '-alert', '--alert_type', 
+        type=str, 
+        help="Whether to send alerts and which type of alert to send (e.g., slack, jira, email)"
+    )
     args = parser.parse_args()
 
-    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, probe_data=args.probe_data, task_name=args.name))
+    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, probe_data=args.probe_data, task_name=args.name, llm=args.smartbot, alert_type=args.alert_type, llm_data=args.llm_data))

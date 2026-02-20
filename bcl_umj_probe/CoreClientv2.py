@@ -1,29 +1,18 @@
 import asyncio
-import re
 import websockets
 import os
 from websockets import ClientConnection, ConnectionClosed
-from typing import Callable
-from utils.network_utils.NetworkDiscovery import NetworkDiscovery
-from utils.network_utils.NetworkTest import NetworkTest
-from utils.network_utils.ProbeInfo import ProbeInfo
-from utils.network_utils.PacketCapture import PacketCapture
 import os
 import logging
-import inspect
 from utils.RedisDB import RedisDB
 import json
 from websockets import ConnectionClosed
 from typing import Optional
 from websockets.asyncio.client import connect
-from crontab import CronTab
 import asyncio
-import ast
-from utils.alerts_utils.LogAlert import LogAlert
 import xmltodict
-from datetime import datetime, timedelta, timezone
-from utils.Parsers import Parsers
-from init_app import action_map, pcap, log_alert, parsers, net_discovery, net_test, slack_alert, jira_alert, email_alert, bot_connection, probe_util, cron
+from datetime import datetime, timezone
+from init_app import action_map, pcap, log_alert, parsers, net_discovery, slack_alert, jira_alert, email_alert, probe_util, cron
 
 
 class CoreClient:
@@ -111,7 +100,7 @@ class CoreClient:
                                     params = core_act_data['prms']
                                 script_path = os.path.join(cwd, 'task_auto.py')
                                 job_comment=f"auto_task_{probe_obj.get('prb_id')}_task_{core_act_data['task']}"
-                                job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {job_comment}", comment=job_comment)
+                                job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {job_comment} -llm {core_act_data.get('llm')} -llmdta '{json.dumps(core_act_data.get('llm_data'))}' -alert '{json.dumps(core_act_data.get('alert_type'))}'", comment=job_comment)
 
                             if core_act_data['auto_type'] == 'flow':
                                 script_path = os.path.join(cwd, 'flow_auto.py')
@@ -172,7 +161,7 @@ class CoreClient:
                                         'task_output': f"{core_act_data['auto_type']} cron job added to {probe_obj.get('name')} at site: {probe_obj.get('site')}.",
                                         'prb_id': probe_obj.get('prb_id'),
                                         'prb_name': probe_obj.get('name'),
-                                        'job_type': f'{core_act_data['auto_type']}',
+                                        'job_type': core_act_data['auto_type'] if core_act_data['auto_type'] == 'flow' else f'{core_act_data['task']}',
                                         'job_name': f'cron_job_{job_comment}',
                                         'act': "prb_task_cnfrm",
                                         'comment': job_comment,
