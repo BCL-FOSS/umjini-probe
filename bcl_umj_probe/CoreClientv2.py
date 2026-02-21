@@ -166,7 +166,8 @@ class CoreClient:
                                         'act': "prb_task_cnfrm",
                                         'comment': job_comment,
                                         'enabled': 'enabled',
-                                        'storage_opt': 'new'
+                                        'storage_opt': 'new',
+                                        'user_id': core_act_data['user_id']
                                     }))
                             else:
                                     self.logger.error("Invalid cron job, not writing to crontab.")
@@ -358,6 +359,7 @@ class CoreClient:
                                         'prb_name': probe_obj.get('name'),
                                         'task_type': f'{core_act_data["task"]}',
                                         'timestamp': datetime.now(tz=timezone.utc).isoformat(),
+                                        'user_id': core_act_data['user_id'],
                                         'act': "prb_task_rslt",
                                     }
                                 await ws.send(json.dumps(task_result))
