@@ -199,6 +199,7 @@ class CoreClient:
                             await asyncio.sleep(1)
                             core_act_data['act'] = 'prb_task_cnfrm'
                             core_act_data['task_output'] = f"Cron job '{core_act_data['comment']}' deleted."
+                            core_act_data['storage_opt'] = 'del'
                             await ws.send(json.dumps(core_act_data))
                         case 'rm_all_tasks':
                             cron.remove_all()
