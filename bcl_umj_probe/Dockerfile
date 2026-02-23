@@ -6,9 +6,6 @@ RUN apt-get update -y
 
 RUN apt-get upgrade -y
 
-#RUN apt-get install sshpass
-
-# Update system and install Ruby, build tools, and sshpass
 RUN apt-get install -y \
     tshark \
     tcpdump \

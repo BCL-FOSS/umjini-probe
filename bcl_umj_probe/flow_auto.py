@@ -6,13 +6,54 @@ from websockets.asyncio.client import connect
 import json
 from utils.RedisDB import RedisDB
 from utils.FlowRunner import FlowRunner
-from init_app import action_map, pcap, log_alert, parsers, net_discovery, net_test, slack_alert, jira_alert, email_alert, bot_connection, probe_util
-import xmltodict
-from net_util_api import prb_id
 from datetime import datetime, timezone
+from utils.network_utils.NetworkDiscovery import NetworkDiscovery
+from utils.network_utils.NetworkTest import NetworkTest
+from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.network_utils.PacketCapture import PacketCapture
+from utils.alerts_utils.SlackAlert import SlackAlert
+from utils.alerts_utils.JiraSM import JiraSM
+from utils.alerts_utils.EmailSenderHandler import EmailSenderHandler
+from utils.alerts_utils.BotConnection import BotConnection
+from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.alerts_utils.LogAlert import LogAlert
+from typing import Callable
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+net_discovery = NetworkDiscovery()
+net_test = NetworkTest()
+pcap = PacketCapture()
+probe_util = ProbeInfo()
+log_alert = LogAlert()
+slack_alert = SlackAlert()
+jira_alert = JiraSM()
+email_alert = EmailSenderHandler()
+bot_connection = BotConnection()
+
+action_map: dict[str, Callable[[dict], object]] = {
+    "trcrt_dns": net_test.dnstraceroute,
+    "trcrt": net_test.traceroute,
+    "test_srvr": net_test.iperf_server,
+    "test_clnt": net_test.iperf_client,
+    "scan_arp": net_discovery.arp_scan,
+    "scan_custom": net_discovery.custom_scan,
+    "scan_dev_id": net_discovery.device_identification_scan,
+    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
+    "scan_full": net_discovery.full_network_scan,
+    "scan_snmp": net_discovery.snmp_scans,
+    "scan_port": net_discovery.port_scan,
+    "pcap_lcl": pcap.pcap_local,
+    "pcap_tux": pcap.pcap_remote_linux,
+    "pcap_win": pcap.pcap_remote_windows,
+    "slack": slack_alert.send_alert_message,
+    "jira": jira_alert.send_alert,
+    "bot": bot_connection.mcp_exec,
+    "email": email_alert.send_transactional_email,
+}
+
+net_discovery.set_interface(probe_util.get_ifaces()[0])
 
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 

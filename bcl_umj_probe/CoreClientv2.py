@@ -22,6 +22,10 @@ class CoreClient:
         self.logger = logging.getLogger(__name__)
         self.umj_ws = umj_ws_url
         self.prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
+        self.cur_dir = os.getcwd()
+        self.scan_dir = os.path.join(self.cur_dir, "nmap_scans")
+        if not os.path.exists(self.scan_dir):
+            os.makedirs(self.scan_dir)
         
     def stop(self):
             # If external stop_event exists, set it
@@ -275,16 +279,11 @@ class CoreClient:
                             parameters = core_act_data['prms']
 
                             if core_act_data['task'].startswith("scan_"):
-                                cur_dir = os.getcwd()
-                                scan_dir = os.path.join(cur_dir, "nmap_scans")
-                                if not os.path.exists(scan_dir):
-                                    os.makedirs(scan_dir)
-
                                 timestamp = datetime.now(tz=timezone.utc).isoformat()
                                 exec_name = f"{core_act_data['task']}_result_{timestamp}"
-                                file=os.path.join(scan_dir, exec_name)
+                                file=os.path.join(self.scan_dir, exec_name)
                                 file_name = f"{file}.xml"
-                                parameters['export_file_name'] = file_name
+                                net_discovery.set_output_file(file_name=file_name)
 
                                 if 'interface' not in parameters or not parameters['interface']:
                                     net_discovery.set_interface(probe_util.get_ifaces()[0])
@@ -433,11 +432,63 @@ class CoreClient:
                 except asyncio.TimeoutError:
                     continue
 
-        # run both tasks and wait until one completes
+        async def _network_mapper():
+            while not stop_event.is_set() and not getattr(self, "_internal_stop", False):
+                timestamp = datetime.now(tz=timezone.utc).isoformat()
+                exec_name = f"net_mapper_result_{timestamp}"
+                file=os.path.join(self.scan_dir, exec_name)
+                file_name = f"{file}.xml"
+                net_discovery.set_output_file(file_name=file_name)
+                net_discovery.set_interface(probe_util.get_ifaces()[0])
+                subnet = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
+
+                handler = action_map.get("scan_full")
+                parameters = {'subnet': subnet}
+                code, output, error = await handler(**parameters)
+                if code != 0:
+                    self.logger.error(f"Network mapping failed with code {code}: {error}")
+                else:
+                    log_message=f""
+                    log_message+=f"{code}\n\n"
+                    log_message+=f"{output}\n\n"
+                    log_message+=f"{error}"
+                    await log_alert.write_log(log_name=f"network_map_{datetime.now(tz=timezone.utc).isoformat()}", message=log_message)
+                    with open(file=f"network_map_{datetime.now(tz=timezone.utc).isoformat()}.xml") as xml_file:
+                        nmap_dict = xmltodict.parse(xml_file.read())
+                    result = parsers.parse_nmap_json(nmap_dict)
+                    network_map_result = {
+                            "prb_id": probe_obj.get('prb_id'),
+                            "destination": "local_network",
+                            "subnet": subnet,
+                            "map_type": "full_scan",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "map": result,
+                            "act": "prb_netmap_rslt"
+                        }
+
+                    try:
+                        await ws.send(json.dumps(network_map_result))
+                    except ConnectionClosed:
+                        self.logger.warning("Network mapping: connection closed")
+                        break
+                    except asyncio.CancelledError:
+                        break
+                    except Exception:
+                        self.logger.exception("Network mapping: failed to send result")
+                        break
+                    # Network mapping interval 300s
+                    try:
+                        await asyncio.wait_for(stop_event.wait(), timeout=300.0)
+                        # If stop_event set, break out
+                        break
+                    except asyncio.TimeoutError:
+                        continue
+
         recv_task = asyncio.create_task(_receive())
         hb_task = asyncio.create_task(_heartbeat())
+        nm_task = asyncio.create_task(_network_mapper())
 
-        done, pending = await asyncio.wait([recv_task, hb_task], return_when=asyncio.FIRST_COMPLETED)
+        done, pending = await asyncio.wait([recv_task, hb_task, nm_task], return_when=asyncio.FIRST_COMPLETED)
 
         # cancel any pending tasks
         for t in pending:
@@ -447,7 +498,7 @@ class CoreClient:
             except Exception:
                 pass
 
-        self.logger.debug("Interact finished (receive/heartbeat)")
+        self.logger.debug("Interact finished (receive/heartbeat/network_mapper)")
 
     async def run(self, stop_event: Optional[asyncio.Event] = None):
         self.logger.info("CoreClient.run starting")

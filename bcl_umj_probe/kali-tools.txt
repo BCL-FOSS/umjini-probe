@@ -1,0 +1,6 @@
+enum4linux (win/tux samba info)
+hping3
+braa (snmp)
+ike-scan (ipsec vpn srvr id)
+irpas
+legion

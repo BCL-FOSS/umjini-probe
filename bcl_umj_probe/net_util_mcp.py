@@ -367,7 +367,7 @@ async def pcap_remote_linux(remote_interface: Annotated[str, "The physical netwo
     return await save_log_and_return(code, output, error, log_name=f"deviceid_result")
 
 @mcp.tool
-async def pcap_remote_windows(remote_interface: Annotated[str, "The physical network interface port of the remote windows server host the packet capture will run on."], host: Annotated[str, "the remote windows server host the packet capture will run on."], username: Annotated[str, "The username of an admin level user of the remote linux host."], password: Annotated[str, "The password of an admin level user on the remote linux host."], duration: Annotated[int, "The number of seconds the packet capture will run on the windows server host."] = None):
+async def pcap_remote_windows(remote_interface: Annotated[str, "The physical network interface port of the remote windows server host the packet capture will run on."], host: Annotated[str, "the remote windows server host the packet capture will run on."], username: Annotated[str, "The username of an admin level user of the remote windows host."], password: Annotated[str, "The password of an admin level user on the remote windows host."], duration: Annotated[int, "The number of seconds the packet capture will run on the windows server host."] = None):
     """pcap remote windows captures and logs ingress and egress traffic on a remote windows host's specified network interface using tshark (commandline wireshark) and npcap. Remote PCAP results are written to the local '/probedata/pcaps' directory from the stdout output from the ssh session."""
 
     header_data = get_http_headers()
@@ -380,20 +380,6 @@ async def pcap_remote_windows(remote_interface: Annotated[str, "The physical net
     if duration is not None:
         code, output, error = await pcap.pcap_remote_windows(remote_iface=remote_interface, duration=duration)
     else:
-        code, output, error = await pcap.pcap_remote_linux(remote_iface=remote_interface)
+        code, output, error = await pcap.pcap_remote_windows(remote_iface=remote_interface)
 
     return await save_log_and_return(code, output, error, log_name=f"deviceid_result")
-
-
-
-
-
-
-
-
-
-
-
-    
-
-
