@@ -60,7 +60,7 @@ net_discovery.set_interface(probe_util.get_ifaces()[0])
 
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 
-async def automate_task(action: str, params: str, ws_url: str, probe_data: str, task_name: str, llm: str = None, llm_data: str = None, alert_type: str = None):
+async def automate_task(action: str, params: str, ws_url: str, probe_data: str, task_name: str, llm: str = None, llm_data: str = None, alert_type: str = None, snmp_community: str = None):
     async with connect(uri=ws_url) as websocket:
         params_dict = json.loads(params)
         probe_data_dict = json.loads(probe_data)
@@ -90,6 +90,23 @@ async def automate_task(action: str, params: str, ws_url: str, probe_data: str, 
             if 'subnet' not in params_dict or not params_dict['subnet'] and params_dict['interface']:
                 net_discovery.set_interface(params_dict['interface'])
                 params_dict['subnet'] = probe_util.get_interface_subnet(interface=params_dict['interface'])['network']
+
+            if action == 'scan_snmp':
+                if 'scripts' in params_dict and params_dict['scripts']:
+                    net_discovery.set_command()
+
+                if snmp_community is not None and 'scripts' in params_dict and params_dict['scripts']:
+                    net_discovery.set_community_string(snmp_community)
+                    net_discovery.set_command()
+
+            if 'noise' in params_dict and params_dict['noise']:
+                net_discovery.set_command()
+
+            if 'limit' in params_dict and params_dict['limit']:
+                net_discovery.set_command()
+
+            if 'ports' in params_dict and params_dict['ports']:
+                net_discovery.set_command()
 
         handler = action_map.get(action)
         if handler and params_dict:
@@ -246,6 +263,11 @@ if __name__ == "__main__":
         type=str, 
         help="Whether to send alerts and which type of alert to send (e.g., slack, jira, email)"
     )
+    parser.add_argument(
+        '-snmp', '--snmp_community', 
+        type=str, 
+        help="SNMP community string for nmap SNMP scans"
+    )
     args = parser.parse_args()
 
-    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, probe_data=args.probe_data, task_name=args.name, llm=args.smartbot, alert_type=args.alert_type, llm_data=args.llm_data))
+    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, prb_id=args.prb_id, probe_data=args.probe_data, task_name=args.name, llm=args.smartbot, alert_type=args.alert_type, llm_data=args.llm_data, snmp_community=args.snmp_community))

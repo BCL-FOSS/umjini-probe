@@ -104,7 +104,16 @@ class CoreClient:
                                     params = core_act_data['prms']
                                 script_path = os.path.join(cwd, 'task_auto.py')
                                 job_comment=f"auto_task_{probe_obj.get('prb_id')}_task_{core_act_data['task']}"
-                                job1=cron.new(command=f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {job_comment} -llm {core_act_data.get('llm')} -llmdta '{json.dumps(core_act_data.get('llm_data'))}' -alert '{json.dumps(core_act_data.get('alert_type'))}'", comment=job_comment)
+
+                                task_command = f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {job_comment} -alert '{json.dumps(core_act_data.get('alert_type'))}'"
+
+                                if 'llm' in core_act_data and core_act_data['llm'] and 'llm_data' in core_act_data and core_act_data['llm_data']:
+                                    task_command += f" -llm {core_act_data.get('llm')} -llmdta '{json.dumps(core_act_data.get('llm_data'))}'"
+
+                                if 'snmp_community' in core_act_data and core_act_data['snmp_community']:
+                                    task_command += f" -snmp {core_act_data.get('snmp_community')}"
+
+                                job1=cron.new(command=task_command, comment=job_comment)
 
                             if core_act_data['auto_type'] == 'flow':
                                 script_path = os.path.join(cwd, 'flow_auto.py')
@@ -292,6 +301,23 @@ class CoreClient:
                                 if 'subnet' not in parameters or not parameters['subnet'] and parameters['interface']:
                                     net_discovery.set_interface(parameters['interface'])
                                     parameters['subnet'] = probe_util.get_interface_subnet(interface=parameters['interface'])['network']
+
+                                if core_act_data['task'] == 'scan_snmp':
+                                    if 'scripts' in parameters and parameters['scripts']:
+                                        net_discovery.set_command()
+
+                                    if 'snmp_community' in core_act_data and 'scripts' in parameters and parameters['scripts']:
+                                        net_discovery.set_community_string(core_act_data['snmp_community'])
+                                        net_discovery.set_command()
+
+                            if 'noise' in parameters and parameters['noise']:
+                                net_discovery.set_command()
+
+                            if 'limit' in parameters and parameters['limit']:
+                                net_discovery.set_command()
+
+                            if 'ports' in parameters and parameters['ports']:
+                                net_discovery.set_command()
 
                             if handler and parameters:
                                 code, output, error = await handler(**parameters)
