@@ -5,9 +5,58 @@ import json
 import httpx
 import os
 import uuid
-from init_app import action_map, net_discovery, net_test, pcap, probe_util, log_alert, parsers, cron, slack_alert, jira_alert, email_alert, bot_connection
 from utils.RedisDB import RedisDB
 from datetime import datetime, timezone
+from utils.Parsers import Parsers
+from utils.network_utils.NetworkDiscovery import NetworkDiscovery
+from utils.network_utils.NetworkTest import NetworkTest
+from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.network_utils.PacketCapture import PacketCapture
+from utils.alerts_utils.SlackAlert import SlackAlert
+from utils.alerts_utils.JiraSM import JiraSM
+from utils.alerts_utils.EmailSenderHandler import EmailSenderHandler
+from utils.alerts_utils.BotConnection import BotConnection
+from utils.network_utils.ProbeInfo import ProbeInfo
+from utils.alerts_utils.LogAlert import LogAlert
+from typing import Callable
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+net_discovery = NetworkDiscovery()
+net_test = NetworkTest()
+pcap = PacketCapture()
+probe_util = ProbeInfo()
+log_alert = LogAlert()
+slack_alert = SlackAlert()
+jira_alert = JiraSM()
+email_alert = EmailSenderHandler()
+bot_connection = BotConnection()
+parsers = Parsers()
+
+action_map: dict[str, Callable[[dict], object]] = {
+    "trcrt_dns": net_test.dnstraceroute,
+    "trcrt": net_test.traceroute,
+    "test_srvr": net_test.iperf_server,
+    "test_clnt": net_test.iperf_client,
+    "scan_arp": net_discovery.arp_scan,
+    "scan_custom": net_discovery.custom_scan,
+    "scan_dev_id": net_discovery.device_identification_scan,
+    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
+    "scan_full": net_discovery.full_network_scan,
+    "scan_snmp": net_discovery.snmp_scans,
+    "scan_port": net_discovery.port_scan,
+    "pcap_lcl": pcap.pcap_local,
+    "pcap_tux": pcap.pcap_remote_linux,
+    "pcap_win": pcap.pcap_remote_windows,
+    "slack": slack_alert.send_alert_message,
+    "jira": jira_alert.send_alert,
+    "bot": bot_connection.mcp_exec,
+    "email": email_alert.send_transactional_email,
+}
+
+net_discovery.set_interface(probe_util.get_ifaces()[0])
+
 
 class FlowRunner:
     def __init__(self):
@@ -85,6 +134,9 @@ class FlowRunner:
 
                         if node_data['prb-snmpscanscripts'] and node_data['prb-scanstype'] == 'scan_snmp':
                             remote_tool_params['scripts'] = node_data['prb-snmpscanscripts']
+
+                        if node_data['prb-snmpcommunity'] and node_data['prb-scanstype'] == 'scan_snmp':
+                            remote_tool_params['community'] = node_data['prb-snmpcommunity']
 
                         if node_data['prb-scanoptions']:
                             remote_tool_params['options'] = node_data['prb-scanoptions']
@@ -171,11 +223,14 @@ class FlowRunner:
                     if node_data['snmp-target']:
                         params['subnet'] = node_data['snmp-target']
 
-                    if node_data['snmp-snamptype']:
-                        params['type'] = node_data['snmp-snamptype']
+                    if node_data['snmp-type']:
+                        params['type'] = node_data['snmp-type']
 
-                    if node_data['snmp-snmpscanscripts']:
-                        params['scripts'] = node_data['snmp-snmpscanscripts']
+                    if node_data['snmp-scripts']:
+                        params['scripts'] = node_data['snmp-scripts']
+
+                    if node_data['snmp-community']:
+                        params['community'] = node_data['snmp-community']
 
                     handler = action_map.get(node_data['name'])     
                     local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
@@ -296,6 +351,42 @@ class FlowRunner:
             for node_id, tool_info in local_tools_to_execute.items():
                 handler = tool_info['name']
                 params = tool_info['arguments']
+                if handler == 'pcap_tux' or handler == 'pcap_win':
+                    pcap.set_host(host=params['host'])
+                    pcap.set_credentials(user=params['usr'], password=params['pwd'])
+
+                if handler.startswith("scan_"):
+                    cur_dir = os.getcwd()
+                    scan_dir = os.path.join(cur_dir, "nmap_scans")
+                    if not os.path.exists(scan_dir):
+                                            os.makedirs(scan_dir)
+
+                    timestamp = datetime.now(tz=timezone.utc).isoformat()
+                    exec_name = f"{handler}_result_{timestamp}"
+                    file=os.path.join(scan_dir, exec_name)
+                    file_name = f"{file}.xml"
+                    params['export_file_name'] = file_name
+
+                    if 'interface' not in params or not params['interface']:
+                        net_discovery.set_interface(probe_util.get_ifaces()[0])
+                        params['subnet'] = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
+                        net_discovery.set_command()
+
+                    elif 'subnet' not in params or not params['subnet'] and params['interface']:
+                        net_discovery.set_interface(params['interface'])
+                        params['subnet'] = probe_util.get_interface_subnet(interface=params['interface'])['network']
+                        net_discovery.set_command()
+
+                    elif handler == 'scan_snmp':
+                        if 'scripts' in params and params['scripts']:
+                            net_discovery.set_command()
+
+                        if 'community' in params and params['community'] and 'scripts' in params and params['scripts']:
+                            net_discovery.set_community_string(params['community'])
+                            net_discovery.set_command()
+                    else:
+                        net_discovery.set_command()
+                        
                 result = await handler(**params)
                 node_output_mapping[node_id]['result'] = result
                 node_output_mapping[node_id]['tool'] = handler

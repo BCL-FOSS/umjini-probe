@@ -86,26 +86,21 @@ async def automate_task(action: str, params: str, ws_url: str, probe_data: str, 
             if 'interface' not in params_dict or not params_dict['interface']:
                 net_discovery.set_interface(probe_util.get_ifaces()[0])
                 params_dict['subnet'] = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
+                net_discovery.set_command()
 
-            if 'subnet' not in params_dict or not params_dict['subnet'] and params_dict['interface']:
+            elif 'subnet' not in params_dict or not params_dict['subnet'] and params_dict['interface']:
                 net_discovery.set_interface(params_dict['interface'])
                 params_dict['subnet'] = probe_util.get_interface_subnet(interface=params_dict['interface'])['network']
+                net_discovery.set_command()
 
-            if action == 'scan_snmp':
+            elif action == 'scan_snmp':
                 if 'scripts' in params_dict and params_dict['scripts']:
                     net_discovery.set_command()
 
                 if snmp_community is not None and 'scripts' in params_dict and params_dict['scripts']:
                     net_discovery.set_community_string(snmp_community)
                     net_discovery.set_command()
-
-            if 'noise' in params_dict and params_dict['noise']:
-                net_discovery.set_command()
-
-            if 'limit' in params_dict and params_dict['limit']:
-                net_discovery.set_command()
-
-            if 'ports' in params_dict and params_dict['ports']:
+            else:
                 net_discovery.set_command()
 
         handler = action_map.get(action)

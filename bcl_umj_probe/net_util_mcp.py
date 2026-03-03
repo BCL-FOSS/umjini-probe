@@ -210,7 +210,7 @@ async def device_identifcation_scan(enable_os_detection: Annotated[bool, "Enable
     return await save_log_and_return(code, output, error, log_name=f"device_id_result")
 
 @mcp.tool
-async def snmp_scan(type: Annotated[str, "Determines the type of SNMP scan used. To identify if SNMP is active on the specified target, set variable to 'snmp_opn'. If SNMP scripts to run on specified target are provided, set variable to 'snmp_enum'. To retrieve all available SNMP information from the specified target, set variable to 'snmp_all'."] = None, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."] = None, scripts: Annotated[str, "The nmap SNMP scan scripts to run. Defaults scripts retrieve system decriptions and system network interface data."] = None):
+async def snmp_scan(type: Annotated[str, "Determines the type of SNMP scan used. To identify if SNMP is active on the specified target, set variable to 'snmp_opn'. If SNMP scripts to run on specified target are provided, set variable to 'snmp_enum'. To retrieve all available SNMP information from the specified target, set variable to 'snmp_all'."] = None, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."] = None, scripts: Annotated[str, "The nmap SNMP scan scripts to run. Defaults scripts retrieve system decriptions and system network interface data."] = None, community: Annotated[str, "The SNMP community string to use for the scan."] = None):
     """SNMP scan identifies SNMP capable network devices, runs specified nmap SNMP scripts to perform SNMPv3 GET requests and SNMP polling and retireves all available SNMP data for the specified target."""
      
     header_data = get_http_headers()
@@ -219,9 +219,17 @@ async def snmp_scan(type: Annotated[str, "Determines the type of SNMP scan used.
     iface, network = probe_utils.get_default_interface_subnet()
     net_discovery.set_interface(iface=iface)
 
-    if interface is not None:
+    if interface is not None and community is not None:
         net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
+        net_discovery.set_community_string(community)
+        net_discovery.set_command()
+
+    elif community is not None:
+        net_discovery.set_community_string(community)
+        net_discovery.set_command()
+    else:
+        net_discovery.set_command()
 
     if target is not None and scripts is not None:
         code, output, error = await net_discovery.snmp_scans(subnet=target, type=type, scripts=scripts)
@@ -249,6 +257,9 @@ async def device_fingerprint_scan(interface: Annotated[str, "The physical networ
     if interface is not None:
         net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
+        net_discovery.set_command()
+    else:
+        net_discovery.set_command()
 
     if target is not None:
         code, output, error = await net_discovery.device_fingerprint_scan(subnet=target, limit=limit)
@@ -270,6 +281,9 @@ async def port_scan(interface: Annotated[str, "The physical network interface po
     if interface is not None:
         net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
+        net_discovery.set_command()
+    else:
+        net_discovery.set_command()
 
     if target is not None and ports is not None:
         code, output, error = await net_discovery.port_scan(subnet=target, ports=ports)
@@ -298,6 +312,9 @@ async def custom_scan( options: Annotated[str, "The nmap scan options to run."],
     if interface is not None:
         net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
+        net_discovery.set_command()
+    else:
+        net_discovery.set_command()
 
     if target is not None and options is not None:
         code, output, error = await net_discovery.custom_scan(subnet=target, options=options)
@@ -320,6 +337,9 @@ async def full_scan(interface: Annotated[str, "The physical network interface po
     if interface is not None:
         net_discovery.set_interface(interface)
         network = probe_utils.get_interface_subnet(interface=interface)['network']
+        net_discovery.set_command()
+    else:
+        net_discovery.set_command()
 
     code, output, error = await net_discovery.full_network_scan(subnet=network)
 

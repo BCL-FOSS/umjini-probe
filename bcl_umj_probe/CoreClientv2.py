@@ -297,27 +297,22 @@ class CoreClient:
                                 if 'interface' not in parameters or not parameters['interface']:
                                     net_discovery.set_interface(probe_util.get_ifaces()[0])
                                     parameters['subnet'] = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
+                                    net_discovery.set_command()
 
-                                if 'subnet' not in parameters or not parameters['subnet'] and parameters['interface']:
+                                elif 'subnet' not in parameters or not parameters['subnet'] and parameters['interface']:
                                     net_discovery.set_interface(parameters['interface'])
                                     parameters['subnet'] = probe_util.get_interface_subnet(interface=parameters['interface'])['network']
+                                    net_discovery.set_command()
 
-                                if core_act_data['task'] == 'scan_snmp':
+                                elif core_act_data['task'] == 'scan_snmp':
                                     if 'scripts' in parameters and parameters['scripts']:
                                         net_discovery.set_command()
 
                                     if 'snmp_community' in core_act_data and 'scripts' in parameters and parameters['scripts']:
                                         net_discovery.set_community_string(core_act_data['snmp_community'])
                                         net_discovery.set_command()
-
-                            if 'noise' in parameters and parameters['noise']:
-                                net_discovery.set_command()
-
-                            if 'limit' in parameters and parameters['limit']:
-                                net_discovery.set_command()
-
-                            if 'ports' in parameters and parameters['ports']:
-                                net_discovery.set_command()
+                                else:
+                                    net_discovery.set_command()
 
                             if handler and parameters:
                                 code, output, error = await handler(**parameters)
