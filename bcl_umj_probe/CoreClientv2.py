@@ -94,7 +94,6 @@ class CoreClient:
                 if probe_id and probe_id == probe_obj.get('prb_id'):
                     match core_act_data['oper']:
                         case 'init_task':
-
                             job1 = None
                             ws_url = f"wss://{probe_obj.get('umj_url')}/v1/api/core/channels/probe/heartbeat/{probe_obj.get('prb_id')}"
                             cwd = os.getcwd()
@@ -104,6 +103,7 @@ class CoreClient:
                                     params = core_act_data['prms']
                                 script_path = os.path.join(cwd, 'task_auto.py')
                                 job_comment=f"auto_task_{probe_obj.get('prb_id')}_task_{core_act_data['task']}"
+                                task_command = ""
 
                                 task_command = f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {job_comment} -alert '{json.dumps(core_act_data.get('alert_type'))}'"
 
@@ -121,55 +121,55 @@ class CoreClient:
                                 job1=cron.new(command=f"python3 {script_path} -f {core_act_data['flow']} -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {core_act_data['flow_name']}", comment=job_comment)
 
                             if 'minutes' in core_act_data and core_act_data['minutes']:
-                                    minutes_range = str(core_act_data['minutes']).split(",")
-                                    if isinstance(minutes_range, list):
-                                        if len(minutes_range) == 3:
-                                            job1.minute.during(minutes_range[0], minutes_range[1]).every(minutes_range[2])
-                                        elif len(minutes_range) == 2:
-                                            job1.minute.during(minutes_range[0], minutes_range[1])
-                                        elif len(minutes_range) == 1:
-                                            job1.minute.every(minutes_range[0])
+                                minutes_range = str(core_act_data['minutes']).split(",")
+                                if isinstance(minutes_range, list):
+                                    if len(minutes_range) == 3:
+                                        job1.minute.during(minutes_range[0], minutes_range[1]).every(minutes_range[2])
+                                    elif len(minutes_range) == 2:
+                                        job1.minute.during(minutes_range[0], minutes_range[1])
+                                    elif len(minutes_range) == 1:
+                                        job1.minute.every(minutes_range[0])
 
                             if 'hours' in core_act_data and core_act_data['hours']:
-                                    hours_range = str(core_act_data['hours']).split(",")
-                                    if isinstance(hours_range, list):
-                                        if len(hours_range) == 3:
-                                            job1.hour.during(hours_range[0], hours_range[1]).every(hours_range[2])
-                                        elif len(hours_range) == 2:
-                                            job1.hour.during(hours_range[0], hours_range[1])
-                                        elif len(hours_range) == 1:
-                                            job1.hour.every(hours_range[0])
+                                hours_range = str(core_act_data['hours']).split(",")
+                                if isinstance(hours_range, list):
+                                    if len(hours_range) == 3:
+                                        job1.hour.during(hours_range[0], hours_range[1]).every(hours_range[2])
+                                    elif len(hours_range) == 2:
+                                        job1.hour.during(hours_range[0], hours_range[1])
+                                    elif len(hours_range) == 1:
+                                        job1.hour.every(hours_range[0])
 
                             if 'dom' in core_act_data and core_act_data['dom']:
-                                    dom_range = str(core_act_data['dom']).split(",")
-                                    if isinstance(dom_range, list):
-                                        if len(dom_range) == 3:
-                                            job1.dom.during(dom_range[0], dom_range[1]).every(dom_range[2])
-                                        elif len(dom_range) == 2:
-                                            job1.dom.during(dom_range[0], dom_range[1])
-                                        elif len(dom_range) == 1:
-                                            job1.dom.every(dom_range[0])
+                                dom_range = str(core_act_data['dom']).split(",")
+                                if isinstance(dom_range, list):
+                                    if len(dom_range) == 3:
+                                        job1.dom.during(dom_range[0], dom_range[1]).every(dom_range[2])
+                                    elif len(dom_range) == 2:
+                                        job1.dom.during(dom_range[0], dom_range[1])
+                                    elif len(dom_range) == 1:
+                                        job1.dom.every(dom_range[0])
 
                             if 'days' in core_act_data and core_act_data['days']:
-                                    days_range = str(core_act_data['days']).split(",")
-                                    if isinstance(days_range, list):
-                                        job1.dow.on(days_range)
+                                days_range = str(core_act_data['days']).split(",")
+                                if isinstance(days_range, list):
+                                    job1.dow.on(days_range)
 
                             if 'months' in core_act_data and core_act_data['months']:
-                                    months_range = str(core_act_data['months']).split(",")
-                                    if isinstance(months_range, list):
-                                        if len(months_range) == 3:
-                                            job1.month.during(months_range[0], months_range[1]).every(months_range[2])
-                                        elif len(months_range) == 2:
-                                            job1.month.during(months_range[0], months_range[1])
-                                        elif len(months_range) == 1:
-                                            job1.month.every(months_range[0])
+                                months_range = str(core_act_data['months']).split(",")
+                                if isinstance(months_range, list):
+                                    if len(months_range) == 3:
+                                        job1.month.during(months_range[0], months_range[1]).every(months_range[2])
+                                    elif len(months_range) == 2:
+                                        job1.month.during(months_range[0], months_range[1])
+                                    elif len(months_range) == 1:
+                                        job1.month.every(months_range[0])
 
                             if await asyncio.to_thread(job1.is_valid()):
-                                    await asyncio.to_thread(cron.write())
-                                    await asyncio.sleep(1)
-                                    self.logger.info(f"Cron job added: {job1}")
-                                    await ws.send(json.dumps({
+                                await asyncio.to_thread(cron.write())
+                                await asyncio.sleep(1)
+                                self.logger.info(f"Cron job added: {job1}")
+                                await ws.send(json.dumps({
                                         'site': probe_obj.get('site'),
                                         'task_output': f"{core_act_data['auto_type']} cron job added to {probe_obj.get('name')} at site: {probe_obj.get('site')}.",
                                         'prb_id': probe_obj.get('prb_id'),
@@ -183,7 +183,7 @@ class CoreClient:
                                         'user_id': core_act_data['user_id']
                                     }))
                             else:
-                                    self.logger.error("Invalid cron job, not writing to crontab.")
+                                self.logger.error("Invalid cron job, not writing to crontab.")
                            
                         case 'disable_task':
                             job = cron.find_comment(comment=core_act_data['comment'])
@@ -460,8 +460,13 @@ class CoreClient:
                 file=os.path.join(self.scan_dir, exec_name)
                 file_name = f"{file}.xml"
                 net_discovery.set_output_file(file_name=file_name)
-                net_discovery.set_interface(probe_util.get_ifaces()[0])
-                subnet = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
+                
+                if os.environ.get('NET_DISCOVERY_IFACE'):
+                    net_discovery.set_interface(os.environ.get('NET_DISCOVERY_IFACE'))
+                    subnet = probe_util.get_interface_subnet(interface=os.environ.get('NET_DISCOVERY_IFACE'))['network']
+                else:
+                    net_discovery.set_interface(probe_util.get_ifaces()[0])
+                    subnet = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
 
                 handler = action_map.get("scan_full")
                 parameters = {'subnet': subnet}
