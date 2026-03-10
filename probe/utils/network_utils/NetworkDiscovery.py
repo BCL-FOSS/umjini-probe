@@ -46,49 +46,48 @@ class NetworkDiscovery(Network):
     def set_interface(self, iface: str):
         self.interface = iface
 
-    async def arp_scan(self, subnet: str):
-        code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('arp')} -sn -PR {subnet}")
+    def get_interface(self):
+        return self.interface
+
+    async def arp_scan(self, target: str):
+        code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('arp')} -sn -PR {target}")
         return code, output, error
     
-    async def device_identification_scan(self, subnet: str, noise: bool = False):
+    async def device_identification_scan(self, target: str, noise: bool = False):
         if noise is True:
-            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('dev_id_noise')} {subnet}")
+            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('dev_id_noise')} {target}")
         else:
-            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('dev_id')} {subnet}")
+            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('dev_id')} {target}")
         return code, output, error
     
-    async def snmp_scans(self, subnet: str, type: str, scripts: str = 'snmp-sysdescr,snmp-interfaces'):
-        match type:
-            case 'snmp_opn':
-                code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('snmp')} {subnet}")
-            case 'snmp_enum': 
-                code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('snmp')} --script={scripts} {subnet}")
-            case 'snmp_all':
-                code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('snmp')} -sV -sC {subnet}")
-                
+    async def snmp_scans(self, target: str, scripts: str = 'snmp-info,snmp-sysdescr,snmp-interfaces,snmp-netstat'):
+        if scripts == 'all':
+            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('snmp')} -sV -sC {target}")
+        else:
+            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('snmp')} --script={scripts} {target}")
         return code, output, error
     
-    async def device_fingerprint_scan(self, subnet: str, limit: bool = True):
+    async def device_fingerprint_scan(self, target: str, limit: bool = True):
         if limit is False:
-            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('dev_fngr')} {subnet}")
+            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('dev_fngr')} {target}")
         else:
-            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('dev_fngr_limit')} {subnet}")
+            code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('dev_fngr_limit')} {target}")
         return code, output, error
     
-    async def port_scan(self, subnet: str, ports: str='22,23,80,443,161,830'):
+    async def port_scan(self, target: str, ports: str='22,23,80,443,161,830'):
      
-        code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('ports')} {ports} {subnet}")
+        code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('ports')} {ports} {target}")
 
         return code, output, error
     
-    async def custom_scan(self, subnet: str, options: str):
+    async def custom_scan(self, target: str, options: str):
         
-        code, output, error = await self.run_shell_cmd(cmd=f"{self.command} {options} {subnet}")
+        code, output, error = await self.run_shell_cmd(cmd=f"{self.command} {options} {target}")
 
         return code, output, error
     
-    async def full_network_scan(self, subnet: str):
-        code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('full_scan')} {subnet}")
+    async def full_network_scan(self, target: str):
+        code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('full_scan')} {target}")
 
         return code, output, error
 

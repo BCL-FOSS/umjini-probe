@@ -3,7 +3,7 @@ services:
     restart: always
     build:
       context: .
-      dockerfile: bcl_umj_probe/Dockerfile.kali
+      dockerfile: probe/Dockerfile.kali
     container_name: umjprobe
     environment:
       - PROBE_DB=127.0.0.1
@@ -13,11 +13,11 @@ services:
       - NET_RAW
       - NET_ADMIN 
     depends_on:
-      - umj_probe_redis
+      - probe_redis
     volumes:
       - probe_app_data:/home/quart/probedata
 
-  umj_probe_redis:
+  probe_redis:
     image: redis:latest
     container_name: probedb
     command: ["redis-server", "--port", "6369", "--appendonly", "yes"]

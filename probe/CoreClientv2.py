@@ -96,18 +96,35 @@ class CoreClient:
                         case 'init_task':
                             job1 = None
                             ws_url = f"wss://{probe_obj.get('umj_url')}/v1/api/core/channels/probe/heartbeat/{probe_obj.get('prb_id')}"
-                            cwd = os.getcwd()
+                            cwd = os.getcwd() 
 
                             if core_act_data['auto_type'] == 'task':
                                 if 'prms' in core_act_data and core_act_data['prms']:
                                     params = core_act_data['prms']
-                                script_path = os.path.join(cwd, 'task_auto.py')
+                                script_path = os.path.join(cwd, 'auto_scripts', 'task_auto.py')
                                 job_comment=f"auto_task_{probe_obj.get('prb_id')}_task_{core_act_data['task']}"
                                 task_command = ""
 
                                 task_command = f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {job_comment} -alert '{json.dumps(core_act_data.get('alert_type'))}'"
 
-                                if 'llm' in core_act_data and core_act_data['llm'] and 'llm_data' in core_act_data and core_act_data['llm_data']:
+                                if 'llm_data' in core_act_data and core_act_data['llm_data']:
+                                    task_command += f" -llm {core_act_data.get('llm')} -llmdta '{json.dumps(core_act_data.get('llm_data'))}'"
+
+                                if 'snmp_community' in core_act_data and core_act_data['snmp_community']:
+                                    task_command += f" -snmp {core_act_data.get('snmp_community')}"
+
+                                job1=cron.new(command=task_command, comment=job_comment)
+
+                            if core_act_data['auto_type'] == 'chat':
+                                if 'prms' in core_act_data and core_act_data['prms']:
+                                    params = core_act_data['prms']
+                                script_path = os.path.join(cwd, 'auto_scripts', 'chat_task_auto.py')
+                                job_comment=f"auto_task_{probe_obj.get('prb_id')}_task_{core_act_data['task']}"
+                                task_command = ""
+
+                                task_command = f"python3 {script_path} -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {job_comment} -alert '{json.dumps(core_act_data.get('alert_type'))}' -t '{core_act_data.get('tool_calls')}'"
+
+                                if 'llm_data' in core_act_data and core_act_data['llm_data']:
                                     task_command += f" -llm {core_act_data.get('llm')} -llmdta '{json.dumps(core_act_data.get('llm_data'))}'"
 
                                 if 'snmp_community' in core_act_data and core_act_data['snmp_community']:
@@ -116,7 +133,7 @@ class CoreClient:
                                 job1=cron.new(command=task_command, comment=job_comment)
 
                             if core_act_data['auto_type'] == 'flow':
-                                script_path = os.path.join(cwd, 'flow_auto.py')
+                                script_path = os.path.join(cwd, 'auto_scripts', 'flow_auto.py')
                                 job_comment=f"auto_task_{probe_obj.get('prb_id')}_flow_{core_act_data['flow_id']}"
                                 job1=cron.new(command=f"python3 {script_path} -f {core_act_data['flow']} -w {ws_url} -pdta '{json.dumps(probe_obj)}' -n {core_act_data['flow_name']}", comment=job_comment)
 
@@ -187,7 +204,6 @@ class CoreClient:
                            
                         case 'disable_task':
                             job = cron.find_comment(comment=core_act_data['comment'])
-                            #iter = cron.find_comment(re.compile(' or \w'))
                             job.enable(False)
                             await asyncio.to_thread(cron.write())
                             await asyncio.sleep(1)
@@ -197,7 +213,6 @@ class CoreClient:
                             await ws.send(json.dumps(core_act_data))
                         case 'enable_task':
                             job = cron.find_comment(comment=core_act_data['comment'])
-                            #iter = cron.find_comment(re.compile(' or \w'))
                             job.enable()
                             await asyncio.to_thread(cron.write())
                             await asyncio.sleep(1)
@@ -207,7 +222,6 @@ class CoreClient:
                             await ws.send(json.dumps(core_act_data))
                         case 'rm_task':
                             job = cron.find_comment(comment=core_act_data['comment'])
-                            #iter = cron.find_comment(re.compile(' or \w'))
                             cron.remove( job )
                             await asyncio.to_thread(cron.write())
                             await asyncio.sleep(1)

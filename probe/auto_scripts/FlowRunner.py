@@ -1,62 +1,10 @@
 import datetime
 import logging
 import ast
-import json
-import httpx
 import os
-import uuid
 from utils.RedisDB import RedisDB
 from datetime import datetime, timezone
-from utils.Parsers import Parsers
-from utils.network_utils.NetworkDiscovery import NetworkDiscovery
-from utils.network_utils.NetworkTest import NetworkTest
-from utils.network_utils.ProbeInfo import ProbeInfo
-from utils.network_utils.PacketCapture import PacketCapture
-from utils.alerts_utils.SlackAlert import SlackAlert
-from utils.alerts_utils.JiraSM import JiraSM
-from utils.alerts_utils.EmailSenderHandler import EmailSenderHandler
-from utils.alerts_utils.BotConnection import BotConnection
-from utils.network_utils.ProbeInfo import ProbeInfo
-from utils.alerts_utils.LogAlert import LogAlert
-from typing import Callable
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-net_discovery = NetworkDiscovery()
-net_test = NetworkTest()
-pcap = PacketCapture()
-probe_util = ProbeInfo()
-log_alert = LogAlert()
-slack_alert = SlackAlert()
-jira_alert = JiraSM()
-email_alert = EmailSenderHandler()
-bot_connection = BotConnection()
-parsers = Parsers()
-
-action_map: dict[str, Callable[[dict], object]] = {
-    "trcrt_dns": net_test.dnstraceroute,
-    "trcrt": net_test.traceroute,
-    "test_srvr": net_test.iperf_server,
-    "test_clnt": net_test.iperf_client,
-    "scan_arp": net_discovery.arp_scan,
-    "scan_custom": net_discovery.custom_scan,
-    "scan_dev_id": net_discovery.device_identification_scan,
-    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
-    "scan_full": net_discovery.full_network_scan,
-    "scan_snmp": net_discovery.snmp_scans,
-    "scan_port": net_discovery.port_scan,
-    "pcap_lcl": pcap.pcap_local,
-    "pcap_tux": pcap.pcap_remote_linux,
-    "pcap_win": pcap.pcap_remote_windows,
-    "slack": slack_alert.send_alert_message,
-    "jira": jira_alert.send_alert,
-    "bot": bot_connection.mcp_exec,
-    "email": email_alert.send_transactional_email,
-}
-
-net_discovery.set_interface(probe_util.get_ifaces()[0])
-
+from probe.init_app import action_map, log_alert, probe_util, net_discovery, pcap
 
 class FlowRunner:
     def __init__(self):
@@ -71,7 +19,7 @@ class FlowRunner:
         probe_data_dict = next(iter(probe_data.values()))
         return probe_data_dict
 
-    async def run(self, flow_str: str, smartbot: bool = False, flowbot: bool = False):
+    async def run(self, flow_str: str):
         probe_data_dict = await self.get_probe_data()
         self.logger.info(f"Probe Data From FlowRunner: {probe_data_dict}")
 
@@ -88,15 +36,14 @@ class FlowRunner:
         agents = {}
         remote_tools_to_execute = {}
         local_tools_to_execute = {}
+        remote_tool_params = {}
                 
         for node_id, node in workflow_data.items():
             node_data = node.get('data')
-            remote_tool_params = {}
-
             match node_data['name']:
                 case str() as s if s.startswith('prb:'):
                     if node_data['prb-trcrttype']:
-                        remote_tool_params = {'target': node_data['prb-trcrttarget']}
+                        remote_tool_params['target'] = node_data['prb-trcrttarget']
 
                         if node_data['prb-trcrtoptions']:
                             remote_tool_params['options'] = node_data['prb-trcrtoptions']
@@ -105,7 +52,7 @@ class FlowRunner:
                         if node_data['prb-trcrtdnsserver'] and node_data['prb-trcrttype'] == 'trcrt_dns':
                             remote_tool_params['server'] = node_data['prb-trcrtdnsserver']
 
-                        remote_tools_to_execute[node_id] = {'name': node_data['prb-trcrttype'], 'arguements': remote_tool_params, 'prb': node_data['name']}
+                        remote_tools_to_execute[node_id] = {'name': node_data['prb-trcrttype'], 'arguments': remote_tool_params, 'prb': node_data['name']}
 
                     if node_data['prb-perftype']:
 
@@ -114,14 +61,11 @@ class FlowRunner:
                         if node_data['prb-perfserver'] and node_data['prb-perftype'] == 'spdtst_clnt':
                             remote_tool_params['server'] = node_data['prb-perfserver']
 
-                        remote_tools_to_execute[node_id] = {'name': node_data['prb-perftype'], 'arguements': remote_tool_params, 'prb': node_data['name']}
+                        remote_tools_to_execute[node_id] = {'name': node_data['prb-perftype'], 'arguments': remote_tool_params, 'prb': node_data['name']}
 
                     if node_data['prb-scanstype']:
-                        if node_data['prb-scaniface']:
-                            remote_tool_params['iface'] = node_data['prb-scaniface']
-
-                        if node_data['prb-scansubnet']:
-                            remote_tool_params['subnet'] = node_data['prb-scansubnet']
+                        if node_data['prb-scantarget']:
+                            remote_tool_params['target'] = node_data['prb-scantarget']
 
                         if node_data['prb-scandevidnoise'] == 'n' and node_data['prb-scanstype'] == 'scan_dev_id':
                             remote_tool_params['limit'] = False
@@ -162,13 +106,6 @@ class FlowRunner:
 
                 case 'scan_arp':
                     params = {}
-                    if node_data['arp-interface'] and not node_data['arp-target']:
-                        net_discovery.set_interface(node_data['arp-interface'])
-                        params['subnet'] = probe_util.get_interface_subnet(node_data['arp-interface'])['network']
-
-                    if node_data['arp-target'] and not node_data['arp-interface']:
-                        params['subnet'] = node_data['arp-target']
-
                     if node_data['arp-target']:
                         params['subnet'] = node_data['arp-target']
 
@@ -178,11 +115,12 @@ class FlowRunner:
 
                     handler = action_map.get(node_data['name'])
                     local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
+                    params = {}
 
                 case 'scan_custom':
                     params = {}
                     if node_data['custom-target']:
-                        params['subnet'] = node_data['custom-target']
+                        params['target'] = node_data['custom-target']
 
                     if node_data['custom-options']:
                         params['options'] = node_data['custom-options']
@@ -192,7 +130,7 @@ class FlowRunner:
 
                 case 'scan_dev_id':
                     if node_data['devid-target']:
-                        params = {'subnet': node_data['devid-target']}
+                        params = {'target': node_data['devid-target']}
 
                     if node_data['devid-noise'] == 'n':
                         params['noise'] = True
@@ -202,7 +140,7 @@ class FlowRunner:
 
                 case 'scan_dev_fngr':
                     if node_data['devfngr-target']:
-                        params = {'subnet': node_data['devfngr-target']}
+                        params = {'target': node_data['devfngr-target']}
 
                     if node_data['devfngr-fplimit'] == 'n':
                         params['limit'] = False
@@ -213,7 +151,7 @@ class FlowRunner:
                 case 'scan_full':
                     params = {}
                     if node_data['full-target']:
-                        params['subnet'] = node_data['full-target']
+                        params['target'] = node_data['full-target']
 
                     handler = action_map.get(node_data['name'])
                     local_tools_to_execute[node_id] = {'tool': handler, 'prms': params}
@@ -221,7 +159,7 @@ class FlowRunner:
                 case 'scan_snmp':
                     params = {}
                     if node_data['snmp-target']:
-                        params['subnet'] = node_data['snmp-target']
+                        params['target'] = node_data['snmp-target']
 
                     if node_data['snmp-type']:
                         params['type'] = node_data['snmp-type']
@@ -238,7 +176,7 @@ class FlowRunner:
                 case 'scan_port':
                     params = {}
                     if node_data['port-target']:
-                        params['subnet'] = node_data['port-target']
+                        params['target'] = node_data['port-target']
 
                     if node_data['port-options']:
                         params['ports'] = node_data['port-options']
@@ -349,8 +287,8 @@ class FlowRunner:
 
         if local_tools_to_execute != {}:
             for node_id, tool_info in local_tools_to_execute.items():
-                handler = tool_info['name']
-                params = tool_info['arguments']
+                handler = tool_info['tool']
+                params = tool_info['prms']
                 if handler == 'pcap_tux' or handler == 'pcap_win':
                     pcap.set_host(host=params['host'])
                     pcap.set_credentials(user=params['usr'], password=params['pwd'])
@@ -365,27 +303,17 @@ class FlowRunner:
                     exec_name = f"{handler}_result_{timestamp}"
                     file=os.path.join(scan_dir, exec_name)
                     file_name = f"{file}.xml"
-                    params['export_file_name'] = file_name
+                    net_discovery.set_output_file(file_name)
 
-                    if 'interface' not in params or not params['interface']:
-                        net_discovery.set_interface(probe_util.get_ifaces()[0])
-                        params['subnet'] = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
-                        net_discovery.set_command()
+                    if handler == 'scan_snmp' and 'community' in params and params['community']:
+                        net_discovery.set_community_string(params['community'])
 
-                    elif 'subnet' not in params or not params['subnet'] and params['interface']:
-                        net_discovery.set_interface(params['interface'])
-                        params['subnet'] = probe_util.get_interface_subnet(interface=params['interface'])['network']
-                        net_discovery.set_command()
-
-                    elif handler == 'scan_snmp':
-                        if 'scripts' in params and params['scripts']:
-                            net_discovery.set_command()
-
-                        if 'community' in params and params['community'] and 'scripts' in params and params['scripts']:
-                            net_discovery.set_community_string(params['community'])
-                            net_discovery.set_command()
+                    if net_discovery.get_interface() == os.environ.get('DEFAULT_INTERFACE'):
+                        params['subnet'] = probe_util.get_interface_subnet(interface=os.environ.get('DEFAULT_INTERFACE'))['network']
                     else:
-                        net_discovery.set_command()
+                        params['subnet'] = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
+                           
+                    net_discovery.set_command()
                         
                 result = await handler(**params)
                 node_output_mapping[node_id]['result'] = result
@@ -423,11 +351,3 @@ class FlowRunner:
                         node_output_mapping[node_id]['tool'] = bot_data['payload']['name']
 
         return node_output_mapping, alerts, agents
-
-                
-
-        
-
-            
-            
-        
