@@ -4,16 +4,12 @@ from fastapi_user_limiter.limiter import rate_limiter
 from pydantic import BaseModel
 from init_app import (
     validate_api_key,
-    init_probe
+    init_probe, logger, prb_db
 )
 import httpx
-import logging
 from net_util_mcp import mcp
-import os
-from utils.RedisDB import RedisDB
 from CoreClientv2 import CoreClient
 import asyncio
-from utils.network_utils.ProbeInfo import ProbeInfo
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -24,35 +20,27 @@ class InitCall(BaseModel):
     prb_api_key: str
     prb_name: str
 
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger('passlib').setLevel(logging.ERROR)
-logger = logging.getLogger(__name__)
-
-prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 prb_id, hstnm, probe_data = init_probe()
-probe_util = ProbeInfo()
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
-
 mcp_app = mcp.http_app(path="/mcp")
 
 @asynccontextmanager
 async def combined_lifespan(app:FastAPI):
     async with mcp_app.lifespan(app):
         # idempotent guard
-        if getattr(app.state, "core_client_started", False) is False:
+        if getattr(app.state, "core_client_started", False) is False and probe_data.get("umj_url"):
             app.state.core_client_started = True
             app.state.core_client = None
             app.state.core_client_task = None
             app.state.core_client_stop = None
 
-            if probe_data.get("umj_url"):
-                ws_url = f"wss://{probe_data.get('umj_url')}/v1/api/core/channels/probe/heartbeat/{probe_data.get('prb_id')}"
-                core_client = CoreClient(umj_ws_url=ws_url)
-                stop_event = asyncio.Event()
-                app.state.core_client_stop = stop_event
-                app.state.core_client = core_client
-                app.state.core_client_task = asyncio.create_task(core_client.run(stop_event))
-                logger.info("Started CoreClient task in FastAPI lifespan")
+            ws_url = f"wss://{probe_data.get('umj_url')}/v1/api/core/channels/probe/heartbeat/{probe_data.get('prb_id')}"
+            core_client = CoreClient(umj_ws_url=ws_url)
+            stop_event = asyncio.Event()
+            app.state.core_client_stop = stop_event
+            app.state.core_client = core_client
+            app.state.core_client_task = asyncio.create_task(core_client.run(stop_event))
+            logger.info("Started CoreClient task in FastAPI lifespan")
         
         yield
         

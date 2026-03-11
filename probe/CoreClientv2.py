@@ -3,8 +3,6 @@ import websockets
 import os
 from websockets import ClientConnection, ConnectionClosed
 import os
-import logging
-from utils.RedisDB import RedisDB
 import json
 from websockets import ConnectionClosed
 from typing import Optional
@@ -12,16 +10,14 @@ from websockets.asyncio.client import connect
 import asyncio
 import xmltodict
 from datetime import datetime, timezone
-from init_app import action_map, pcap, log_alert, parsers, net_discovery, slack_alert, jira_alert, email_alert, probe_util, cron
+from init_app import action_map, pcap, log_alert, parsers, net_discovery, slack_alert, jira_alert, email_alert, probe_util, cron, prb_db, logger
 
 
 class CoreClient:
     def __init__(self, umj_ws_url: str):
-        logging.basicConfig(level=logging.DEBUG)
-        logging.getLogger('passlib').setLevel(logging.ERROR)
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         self.umj_ws = umj_ws_url
-        self.prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
+        self.prb_db = prb_db
         self.cur_dir = os.getcwd()
         self.scan_dir = os.path.join(self.cur_dir, "nmap_scans")
         if not os.path.exists(self.scan_dir):
