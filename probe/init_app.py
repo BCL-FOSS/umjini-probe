@@ -35,13 +35,7 @@ jira_alert = JiraSM()
 email_alert = EmailSenderHandler()
 bot_connection = BotConnection()
 parsers = Parsers()
-cron=CronTab(user='root')
-
-if os.environ.get('DEFAULT_INTERFACE') is None:
-    net_discovery.set_interface(probe_util.get_ifaces()[0])
-else:
-    net_discovery.set_interface(os.environ.get('DEFAULT_INTERFACE'))
-    
+cron=CronTab(user='root')  
 action_map: dict[str, Callable[[dict], object]] = {
     "trcrt_dns": net_test.dnstraceroute,
     "trcrt": net_test.traceroute,
@@ -64,19 +58,23 @@ action_map: dict[str, Callable[[dict], object]] = {
 
 }
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
-probe_utils = ProbeInfo()
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 r = redis.Redis(host=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'), decode_responses=True)
 pong = r.ping()
 logger.info(f"Redis ping: {pong}")
 
 def init_probe():
-    prb_id, hstnm = probe_utils.gen_probe_register_data()
+    prb_id, hstnm = probe_util.gen_probe_register_data()
     cursor, keys = r.scan(cursor=0, match=f'*prb:*')
 
+    if os.environ.get('DEFAULT_INTERFACE') is None:
+        net_discovery.set_interface(probe_util.get_ifaces()[0])
+    else:
+        net_discovery.set_interface(os.environ.get('DEFAULT_INTERFACE'))
+
     if not keys:
-        probe_data=probe_utils.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
-        host_interfaces = probe_utils.get_ifaces()
+        probe_data=probe_util.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
+        host_interfaces = probe_util.get_ifaces()
         probe_data['iface_list'] = host_interfaces
         logger.info(host_interfaces)
 
@@ -96,7 +94,7 @@ def init_probe():
         return prb_id, hstnm, probe_data
         
 def validate_api_key(key: str = Depends(api_key_header)):
-    _, hostname = probe_utils.gen_probe_register_data()
+    _, hostname = probe_util.gen_probe_register_data()
     cursor, keys = r.scan(cursor=0, match=f'*prb:*')
 
     if keys:
