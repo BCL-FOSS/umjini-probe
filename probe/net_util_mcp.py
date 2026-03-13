@@ -1,21 +1,14 @@
 from fastmcp import FastMCP
 from typing import Annotated
-from utils.network_utils.ProbeInfo import ProbeInfo
-import logging
 import redis
 from fastapi import HTTPException, status
 from passlib.hash import bcrypt
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
 import os
-from init_app import log_alert
+from init_app import log_alert, logger, probe_util
 from auto_scripts.script_base.base import run_task
 import json
-
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger('passlib').setLevel(logging.ERROR)
-logger = logging.getLogger(__name__)
-probe_utils = ProbeInfo()
 
 r = redis.Redis(host=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'), decode_responses=True)
 pong = r.ping()
@@ -28,7 +21,7 @@ def verify_api(headers: dict[str, str]) -> None:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing API key in tool call"
         )
-    _, hostname = probe_utils.gen_probe_register_data()
+    _, hostname = probe_util.gen_probe_register_data()
     cursor, keys = r.scan(cursor=0, match=f'*prb:*')
 
     if keys:
