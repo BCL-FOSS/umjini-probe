@@ -1,17 +1,14 @@
 import datetime
-import logging
 import ast
-import os
-from utils.RedisDB import RedisDB
 from datetime import datetime, timezone
-from probe.init_app import action_map, log_alert, probe_util, net_discovery, pcap
+from probe.init_app import action_map, log_alert, probe_util, net_discovery, logger, prb_db
+from script_base.base import run_task
+import json
 
 class FlowRunner:
     def __init__(self):
-        logging.basicConfig(level=logging.DEBUG)
-        logging.getLogger('passlib').setLevel(logging.ERROR)
-        self.logger = logging.getLogger(__name__)
-        self.prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
+        self.logger = logger
+        self.prb_db = prb_db
 
     async def get_probe_data(self):
         await self.prb_db.connect_db()
@@ -287,41 +284,14 @@ class FlowRunner:
 
         if local_tools_to_execute != {}:
             for node_id, tool_info in local_tools_to_execute.items():
-                handler = tool_info['tool']
-                params = tool_info['prms']
-                if handler == 'pcap_tux' or handler == 'pcap_win':
-                    pcap.set_host(host=params['host'])
-                    pcap.set_credentials(user=params['usr'], password=params['pwd'])
+                code, output, error, file_name = await run_task(action=tool_info['tool'], params=json.dumps(tool_info['prms']), snmp_community=tool_info['prms'].get('community') if 'community' in tool_info['prms'] else None)
 
-                if handler.startswith("scan_"):
-                    cur_dir = os.getcwd()
-                    scan_dir = os.path.join(cur_dir, "nmap_scans")
-                    if not os.path.exists(scan_dir):
-                                            os.makedirs(scan_dir)
-
-                    timestamp = datetime.now(tz=timezone.utc).isoformat()
-                    exec_name = f"{handler}_result_{timestamp}"
-                    file=os.path.join(scan_dir, exec_name)
-                    file_name = f"{file}.xml"
-                    net_discovery.set_output_file(file_name)
-
-                    if handler == 'scan_snmp' and 'community' in params and params['community']:
-                        net_discovery.set_community_string(params['community'])
-
-                    if net_discovery.get_interface() == os.environ.get('DEFAULT_INTERFACE'):
-                        params['subnet'] = probe_util.get_interface_subnet(interface=os.environ.get('DEFAULT_INTERFACE'))['network']
-                    else:
-                        params['subnet'] = probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
-                           
-                    net_discovery.set_command()
-                        
-                result = await handler(**params)
-                node_output_mapping[node_id]['result'] = result
-                node_output_mapping[node_id]['tool'] = handler
+                node_output_mapping[node_id]['result'] = output
+                node_output_mapping[node_id]['tool'] = tool_info['tool']
                 node_output_mapping[node_id]['prb'] = probe_data_dict.get('name')
 
                 timestamp = datetime.now(tz=timezone.utc).isoformat()
-                await log_alert.write_log(log_name=f"{handler}_result_{timestamp}", message=result)
+                await log_alert.write_log(log_name=f"{tool_info['tool']}_result_{timestamp}", message=output)
 
         if remote_tools_to_execute != {}:
             for node_id, tool_info in remote_tools_to_execute.items():

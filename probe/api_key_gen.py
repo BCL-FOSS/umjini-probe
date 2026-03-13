@@ -1,27 +1,15 @@
-from utils.RedisDB import RedisDB
-from utils.network_utils.ProbeInfo import ProbeInfo
 from uuid import uuid4
 import asyncio
-import argparse
-import os
 from passlib.hash import bcrypt
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
-util_obj = ProbeInfo()
+from init_app import prb_db, logger
 
 async def generate_api_key():
-    
     await prb_db.connect_db()
-
-    if await prb_db.get_all_data(match=f'prb-*', cnfrm=True) is False:
+    if await prb_db.get_all_data(match=f'prb:*', cnfrm=True) is False:
         logger.error("Failed to create probe API key.Restart the umjprobe container and try again...")
         return
 
-    probe_data = await prb_db.get_all_data(match=f'prb-*')
+    probe_data = await prb_db.get_all_data(match=f'prb:*')
     probe_data_dict = next(iter(probe_data.values()))
     probe_id = probe_data_dict.get('prb_id')
 

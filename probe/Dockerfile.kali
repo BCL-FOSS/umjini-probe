@@ -31,11 +31,11 @@ WORKDIR /home/quart
 RUN mkdir /home/quart/probedata
 RUN mkdir /home/quart/probedata/pcaps
 
-COPY bcl_umj_probe/requirements.txt ./
+COPY probe/requirements.txt ./
 
 RUN pip install --no-cache-dir -r requirements.txt --upgrade 
 
-COPY bcl_umj_probe/ /home/quart/
+COPY probe/ /home/quart/
 
 RUN chmod +x boot.sh
 
