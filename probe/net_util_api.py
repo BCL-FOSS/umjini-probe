@@ -10,6 +10,8 @@ import httpx
 from net_util_mcp import mcp
 from CoreClientv2 import CoreClient
 import asyncio
+from auto_scripts.script_base.base import run_task, parse_scan_results
+import json
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -19,6 +21,10 @@ class InitCall(BaseModel):
     prb_url: str
     prb_api_key: str
     prb_name: str
+
+class ExecuteCall(BaseModel):
+    action: str
+    params: dict
 
 prb_id, hstnm, probe_data = init_probe()
 logger.info(f"Probe initialized id={prb_id}, hostname={hstnm}")
@@ -73,11 +79,11 @@ async def _make_http_request(cmd: str, url: str, payload: dict = {}, headers: di
         elif cmd == 'g':
             return await client.get(url, headers=headers)
         
-@api.get("/v1/api/status", dependencies=[Depends(rate_limiter(2, 5))])
+@api.get("/v1/api/status", dependencies=[Depends(rate_limiter(2, 5)), Depends(validate_api_key)])
 def status():
     return Response(content='{"status": "ok"}', media_type="application/json", status_code=200)
 
-@api.post("/v1/api/init", dependencies=[Depends(validate_api_key)])
+@api.post("/v1/api/init", dependencies=[Depends(validate_api_key), Depends(rate_limiter(2, 5))])
 async def init(init_data: InitCall):
     init_url = f"https://{init_data.umj_url}/init?usr={init_data.umj_usr}"
     logger.info(init_url)
@@ -123,16 +129,26 @@ async def init(init_data: InitCall):
         probe_info_dict = next(iter(probe_info.values()))
         probe_id = probe_info_dict.get('prb_id')
 
-        umj_probe_data = {'url': init_data.prb_url,
-                          'site': init_data.umj_site,
-                          'name': init_data.prb_name,
-                          'assigned_user': init_data.umj_usr,
-                          'umj_url': init_data.umj_url,
-                          'umj_api_key': init_data.umj_api_key,
+        probe_data['umj_url'] = init_data.umj_url
+        probe_data['umj_api_key'] = init_data.umj_api_key
+        probe_data.pop('prb_api_key')
 
-                          }
+        return Response(content='{"status": "ok"}', media_type="application/json", status_code=200) if await prb_db.upload_db_data(id=probe_id, data=probe_data) > 0 else Response(content='{"Error": "occurred during probe adoption"}', media_type="application/json", status_code=400)
+        
+@api.post("/v1/api/exec", dependencies=[Depends(validate_api_key), Depends(rate_limiter(5, 10))])
+async def execute(tool_call: ExecuteCall):
+    code, output, error, file_name = await run_task(action=tool_call.action, params=json.dumps(tool_call.params), snmp_community=tool_call.params.get('community') if 'community' in tool_call.params else None)
 
-        if await prb_db.upload_db_data(id=probe_id, data=umj_probe_data) > 0:
-            return Response(content='{"status": "ok"}', media_type="application/json", status_code=200)
-        else:
-            return Response(content='{"Error": "occurred during probe adoption"}', media_type="application/json", status_code=400)
+    if code == 0:
+        parsed_result = await parse_scan_results(action=tool_call.action, file_name=file_name, probe_data_dict=probe_data, params_dict=tool_call.params, output=output)
+    else:
+        parsed_result = None
+
+    return_data = {
+        "code": code,
+        "output": output,
+        "error": error,
+        "parsed_result": parsed_result
+    }
+    return Response(content=json.dumps(return_data), media_type="application/json", status_code=200 if code == 0 else 400)
+        

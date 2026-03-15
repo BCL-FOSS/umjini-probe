@@ -18,10 +18,6 @@ class CoreClient:
         self.logger = logger
         self.umj_ws = umj_ws_url
         self.prb_db = prb_db
-        self.cur_dir = os.getcwd()
-        self.scan_dir = os.path.join(self.cur_dir, "nmap_scans")
-        if not os.path.exists(self.scan_dir):
-            os.makedirs(self.scan_dir)
         
     def stop(self):
             # If external stop_event exists, set it
@@ -83,6 +79,7 @@ class CoreClient:
                 raw_message = await ws.recv()
                 core_act_data = json.loads(raw_message)
                 self.logger.info(f"Received CoreClient message: {core_act_data}.")
+
                 def schedule_parsing(job1: CronTab):
                     if 'minutes' in core_act_data and core_act_data['minutes']:
                                 minutes_range = str(core_act_data['minutes']).split(",")
@@ -133,7 +130,6 @@ class CoreClient:
 
                 probe_id = core_act_data['prb_id']
                 if probe_id and probe_id == probe_obj.get('prb_id'):
-                    
                     match core_act_data['oper']:
                         case 'init_task':
                             job1 = None
@@ -148,16 +144,16 @@ class CoreClient:
                             if core_act_data['auto_type'] == 'task':
                                 task_command = f"python3 {script_path} -a {core_act_data['task']} -p '{json.dumps(params)}' -w {ws_url} -pdta '{json.dumps(probe_obj)}' -llmdta '{json.dumps(core_act_data.get('llm_data'))}'"
 
-                                if 'snmp_community' in core_act_data and core_act_data['snmp_community']:
-                                    task_command += f" -snmp {core_act_data.get('snmp_community')}"
+                                if 'community' in core_act_data and core_act_data['community']:
+                                    task_command += f" -snmp {core_act_data.get('community')}"
 
                                 job1=cron.new(command=task_command, comment=job_comment)
 
                             if core_act_data['auto_type'] == 'chat':
                                 task_command = f"python3 {script_path} -w {ws_url} -pdta '{json.dumps(probe_obj)}' -t '{core_act_data.get('tool_calls')}' -llmdta '{json.dumps(core_act_data.get('llm_data'))}'"
 
-                                if 'snmp_community' in core_act_data and core_act_data['snmp_community']:
-                                    task_command += f" -snmp {core_act_data.get('snmp_community')}"
+                                if 'community' in core_act_data and core_act_data['community']:
+                                    task_command += f" -snmp {core_act_data.get('community')}"
 
                                 job1=cron.new(command=task_command, comment=job_comment)
 

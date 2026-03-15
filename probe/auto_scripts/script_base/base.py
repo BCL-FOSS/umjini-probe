@@ -8,8 +8,8 @@ async def run_task(action: str, params: str, snmp_community: str = None):
     params_dict = json.loads(params)
             
     if action == 'pcap_tux' or action == 'pcap_win':
-        pcap.set_host(host=params_dict['host'])
-        pcap.set_credentials(user=params_dict['usr'], password=params_dict['pwd'])
+        pcap.set_host(host=params_dict['tool_prms']['host'])
+        pcap.set_credentials(user=params_dict['tool_prms']['usr'], password=params_dict['tool_prms']['pwd'])
 
     if action.startswith("scan_"):
         cur_dir = os.getcwd()
@@ -26,19 +26,21 @@ async def run_task(action: str, params: str, snmp_community: str = None):
         if action == 'scan_snmp' and snmp_community is not None:
             net_discovery.set_community_string(snmp_community)
 
-        if 'target' not in params_dict and (action == 'scan_full' or action == 'scan_snmp'):     
-            params_dict['target'] = probe_util.get_interface_subnet(interface=os.environ.get('DEFAULT_INTERFACE'))['network'] if os.environ.get('DEFAULT_INTERFACE') else probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
-        elif 'target' in params_dict and 'interface' in params_dict and (action == 'scan_full' or action == 'scan_snmp'):
+        if 'target' not in params_dict['tool_prms'] and 'interface' not in params_dict and (action == 'scan_full' or action == 'scan_snmp'):     
+            params_dict['tool_prms']['target'] = probe_util.get_interface_subnet(interface=os.environ.get('DEFAULT_INTERFACE'))['network'] if os.environ.get('DEFAULT_INTERFACE') else probe_util.get_interface_subnet(interface=probe_util.get_ifaces()[0])['network']
+        elif 'target' in params_dict['tool_prms'] and 'interface' in params_dict and (action == 'scan_full' or action == 'scan_snmp'):
             net_discovery.set_interface(params_dict['interface'])
 
         net_discovery.set_command()
 
     handler = action_map.get(action)
     if handler and params_dict:
-        code, output, error = await handler(**params_dict)
+        code, output, error = await handler(**params_dict['tool_prms'])
 
     if code == 0:
         return code, output, error, file_name
+    else:
+        return code, output, error, None
         
 async def parse_scan_results(action: str, file_name: str, probe_data_dict: dict, params_dict: dict, output: str):
     match action:
@@ -51,7 +53,7 @@ async def parse_scan_results(action: str, file_name: str, probe_data_dict: dict,
             hops = parsers.parse_traceroute_output(output, action)
             result = {
                         "source": probe_data_dict.get('prb_id'),
-                        "destination": params_dict['target'],
+                        "destination": params_dict['tool_prms']['target'],
                         "trace_type": action,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "hops": hops
