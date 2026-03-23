@@ -234,7 +234,7 @@ class CoreClient:
                                     core_act_data['task_output'] = f"Cron job '{core_act_data['comment']}' rescheduled."
                                     await ws.send(json.dumps(core_act_data))
                         case 'exec':    
-                            code, output, error, file_name = await run_task(action=core_act_data['task'], params=core_act_data['prms'], snmp_community=core_act_data.get('snmp_community') if 'snmp_community' in core_act_data else None)
+                            code, output, error, file_name = await run_task(action=core_act_data['task'], params=core_act_data['prms'], snmp_community=core_act_data.get('community') if 'community' in core_act_data else None)
 
                             log_message=f""
                             log_message+=f"{code}\n\n"
@@ -349,6 +349,7 @@ class CoreClient:
 
                 network_map_result = {
                     "prb_id": probe_obj.get('prb_id'),
+                    "site": probe_obj.get('site'),
                     "map_type": "full_scan",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "map": result,
