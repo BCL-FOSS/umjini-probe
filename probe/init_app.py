@@ -19,6 +19,7 @@ from crontab import CronTab
 from utils.alerts_utils.LogAlert import LogAlert
 from utils.Parsers import Parsers
 from utils.RedisDB import RedisDB
+import asyncio
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)
@@ -41,13 +42,12 @@ action_map: dict[str, Callable[[dict], object]] = {
     "trcrt": net_test.traceroute,
     "test_srvr": net_test.iperf_server,
     "test_clnt": net_test.iperf_client,
-    "scan_arp": net_discovery.arp_scan,
-    "scan_custom": net_discovery.custom_scan,
-    "scan_dev_id": net_discovery.device_identification_scan,
-    "scan_dev_fngr": net_discovery.device_fingerprint_scan,
-    "scan_full": net_discovery.full_network_scan,
-    "scan_snmp": net_discovery.snmp_scans,
-    "scan_port": net_discovery.port_scan,
+    "scan_vuln": net_discovery.vulnerabilities,
+    "scan_snmp": net_discovery.snmp,
+    "scan_os": net_discovery.operating_system,
+    "scan_srvc": net_discovery.services,
+    "scan_cust": net_discovery.custom,
+    "scan_map": net_discovery.mapper,
     "pcap_lcl": pcap.pcap_local,
     "pcap_tux": pcap.pcap_remote_linux,
     "pcap_win": pcap.pcap_remote_windows,
@@ -55,17 +55,21 @@ action_map: dict[str, Callable[[dict], object]] = {
     "jira": jira_alert.send_alert,
     "bot": bot_connection.mcp_exec,
     "email": email_alert.send_transactional_email,
-
 }
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
 r = redis.Redis(host=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'), decode_responses=True)
 pong = r.ping()
 logger.info(f"Redis ping: {pong}")
+error_response = 'missing required data'
 
 def init_probe():
+    db_init = asyncio.run(prb_db.connect_db())
+    if db_init is None:
+        exit(1)
+
     prb_id, hstnm = probe_util.gen_probe_register_data()
-    cursor, keys = r.scan(cursor=0, match=f'*prb:*')
+    _, keys = r.scan(cursor=0, match=f'*prb:*')
 
     if os.environ.get('DEFAULT_INTERFACE') is None:
         net_discovery.set_interface(probe_util.get_ifaces()[0])
@@ -92,28 +96,43 @@ def init_probe():
             prb_id = hash_data.get('prb_id')
             probe_data = hash_data
         return prb_id, hstnm, probe_data
-        
-def validate_api_key(key: str = Depends(api_key_header)):
-    _, hostname = probe_util.gen_probe_register_data()
-    cursor, keys = r.scan(cursor=0, match=f'*prb:*')
-
-    if keys:
-        for redis_key in keys:
-            hash_data = r.hgetall(redis_key)
-            logger.info(hash_data)
-            stored_api_key = hash_data.get("api_key")
-            logger.info(stored_api_key)
-
-            if not stored_api_key:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or missing API key"
-                )
-
-            if bcrypt.verify(key, stored_api_key):
-                return 200
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or missing API key"
-                )
+            
+async def validate_api_key(key: str = Depends(api_key_header)):
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=error_response
+        )
+    if await prb_db.get_all_data(match='*prb:*', cnfrm=True) is False:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=error_response
+        )
+    await check_api_key(key)
+            
+async def validate_mcp_api_key(headers: dict[str, str]) -> None:
+    key = headers.get("x-api-key")
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=error_response
+        )
+    if await prb_db.get_all_data(match='*prb:*', cnfrm=True) is False:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=error_response
+        )
+    await check_api_key(key)
+    
+async def check_api_key(key: str):
+    probe_data = await prb_db.get_all_data(match='*prb:*')
+    probe_data_dict = next(iter(probe_data.values()))
+    stored_api_key = probe_data_dict.get("api_key")
+    
+    if not stored_api_key or not bcrypt.verify(key, stored_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid"
+        )
+    else:
+        return 200

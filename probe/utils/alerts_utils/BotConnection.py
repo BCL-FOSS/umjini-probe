@@ -10,6 +10,6 @@ class BotConnection(Alert):
         if init_response.status_code == 200:
             access_token = init_response.cookies.get("access_token")
         
-        bot_response = await self.make_request('p', url=f"http://{url}/v1/api/core/probes/exec/{payload.get('prb_id')}?usr={usr}", headers=headers, payload=payload, cookies=access_token)
+        bot_response = await self.make_request('p', url=f"https://{url}/v1/api/core/probes/exec/{payload.get('prb_id')}/tasks/exec?usr={usr}", headers=headers, payload=payload, cookies=access_token)
 
         return bot_response

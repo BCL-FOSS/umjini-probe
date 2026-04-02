@@ -19,6 +19,7 @@ class RedisDB:
             return None
         else:
             self.logger.info(f'Redis connection to {self.host_name} succeeded.')
+            return True
 
     async def ping_db(self):
         try:

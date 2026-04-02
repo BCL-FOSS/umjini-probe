@@ -249,7 +249,6 @@ class FlowRunner:
                             }
                 
                 mcp_run = await handler(**bot_data)
-
                 if mcp_run.status_code == 200:
                     mcp_tool_data = mcp_run.json()
                     if node_id in node_output_mapping and node_output_mapping[node_id]:

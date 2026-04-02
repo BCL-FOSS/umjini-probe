@@ -4,28 +4,15 @@ from websockets.asyncio.client import connect
 import json
 from FlowRunner import FlowRunner
 from probe.init_app import logger
+from script_base.base import run_task, parse_scan_results, send_smartbot_data
+
 
 async def run_flow(flow: str, ws_url: str, probe_data: str, flow_name: str):
     flow_runner = FlowRunner()
     tool_output, alerts, agents = await flow_runner.run(flow_str=flow)
     probe_data_dict = json.loads(probe_data)
-    
     async with connect(uri=ws_url) as websocket:
-        smartbot_call = {
-                 'act': 'smartbot_flow',
-                 'url': f"{probe_data_dict.get('url')}/llm/mcp",
-                 'tool_output': tool_output,
-                 'prompt': agents['prompt'],
-                 'prb_api_key': probe_data_dict.get('prb_api_key'),
-                 'prb_id': probe_data_dict.get('prb_id'),
-                 'prb_name': probe_data_dict.get('name'),
-                 'site': probe_data_dict.get('site'),
-                 'alerts': alerts  ,
-                 'task_type': 'flow',
-                 'flow_name': flow_name,
-            }
-
-        await websocket.send(json.dumps(smartbot_call))
+        await send_smartbot_data(ws=websocket, probe_data_dict=probe_data_dict, smartbot_data=agents, tool_call_resp=tool_output)
                 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Automate network monitoring tasks.")

@@ -1,49 +1,10 @@
 from fastmcp import FastMCP
 from typing import Annotated
-import redis
-from fastapi import HTTPException, status
-from passlib.hash import bcrypt
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
-import os
-from init_app import log_alert, logger, probe_util
+from init_app import log_alert, validate_mcp_api_key
 from auto_scripts.script_base.base import run_task
 import json
-
-r = redis.Redis(host=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'), decode_responses=True)
-pong = r.ping()
-logger.info(f"Redis ping: {pong}")
-
-def verify_api(headers: dict[str, str]) -> None:
-    key = headers.get("x-api-key")
-    if not key:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing API key in tool call"
-        )
-    _, hostname = probe_util.gen_probe_register_data()
-    cursor, keys = r.scan(cursor=0, match=f'*prb:*')
-
-    if keys:
-        for redis_key in keys:
-            hash_data = r.hgetall(redis_key)
-            logger.info(hash_data)
-            stored_api_key = hash_data.get("api_key")
-            logger.info(stored_api_key)
-
-            if not stored_api_key:
-                raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Invalid or missing API key"
-                )
-
-            if bcrypt.verify(key, stored_api_key):
-                return 200
-            else:
-                raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Invalid or missing API key"
-                )
 
 mcp = FastMCP(name="umjiniti-probe: network management utility")
 
@@ -52,9 +13,7 @@ async def save_log_and_return(code: int, output: str, error: str, log_name: str)
     log_message+=f"{code}\n\n"
     log_message+=f"{output}\n\n"
     log_message+=f"{error}"
-
     await log_alert.write_log(log_name=log_name, message=log_message)
-
     return code, output, error
 
 @mcp.tool
@@ -62,14 +21,14 @@ async def test_srvr(options: Annotated[str, "Additional command line flags to ad
     """Runs speedtest server which performs active measurements of the maximum achievable bandwidth on the specified IP network (host). Supports tuning of various parameters related to timing, buffers and protocols (TCP, UDP, SCTP with IPv4 and IPv6) via the command line flag options provided by the user. For each test it reports the bandwidth, loss, and other parameters."""
 
     header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
+    await validate_mcp_api_key(header_data)
+    params = {'tool_prms': {}}
     
     if options and options.strip() != '':
-        params['options'] = options
+        params['tool_prms']['options'] = options
     
     if host and host.strip() != '':
-        params['host'] = host
+        params['tool_prms']['host'] = host
     
     code, output, error, _ = await run_task(action="test_srvr", params=json.dumps(params))
     return await save_log_and_return(code, output, error, log_name=f"speedtest_srvr_result")
@@ -79,16 +38,16 @@ async def test_clnt(server: Annotated[str, "The speedtest server the client conn
     """Starts the client-side of the speedtest to assist with active measurements of the maximum achievable bandwidth from client to the specified server."""
 
     header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
+    await validate_mcp_api_key(header_data)
+    params = {'tool_prms': {}}
     
     if options and options.strip() != '':
-        params['options'] = options
+        params['tool_prms']['options'] = options
       
     if host and host.strip() != '':
-        params['host'] = host
+        params['tool_prms']['host'] = host
     
-    params['server'] = server
+    params['tool_prms']['server'] = server
     code, output, error, _ = await run_task(action="test_clnt", params=json.dumps(params))
     return await save_log_and_return(code, output, error, log_name=f"speedtest_client_result")
 
@@ -99,16 +58,16 @@ async def trcrt(target: Annotated[str, "The server or endpoint to trace."], opti
        each gateway along the path to the host."""
 
     header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
+    await validate_mcp_api_key(header_data)
+    params = {'tool_prms': {}}
 
     if options and options.strip() != '':
-       params['options'] = options
+       params['tool_prms']['options'] = options
 
     if packetlength and packetlength.strip() != '':
-        params['packetlen'] = packetlength
+        params['tool_prms']['packetlen'] = packetlength
 
-    params['target'] = target
+    params['tool_prms']['target'] = target
     code, output, error, _ = await run_task(action="trcrt", params=json.dumps(params))
 
     return await save_log_and_return(code, output, error, log_name=f"traceroute_result")
@@ -120,50 +79,50 @@ async def trcrt_dns(target: Annotated[str, "The server or endpoint to trace."], 
        any unwanted path."""
 
     header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
+    await validate_mcp_api_key(header_data)
+    params = {'tool_prms': {}}
 
     if options and options.strip() != '':
-        params['options'] = options
+        params['tool_prms']['options'] = options
      
     if server and server.strip() != '':
-       params['server'] = server
+       params['tool_prms']['server'] = server
        
-    params['target'] = target
+    params['tool_prms']['target'] = target
     code, output, error, _ = await run_task(action="trcrt_dns", params=json.dumps(params))
 
     return await save_log_and_return(code, output, error, log_name=f"dns_traceroute_result")
 
 @mcp.tool
-async def scan_arp(target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
-    """ARP scan uses the ARP protocol to discover and fingerprint IP hosts on the network. Bypasses firewalls that block ICMP. Excellent for device inventory."""
+async def scan_vuln(target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, min_score: Annotated[int, "The minimum CVSS score to filter vulnerabilities. Defaults to 5."] = None):
+    """scan_vuln runs a vulnerability scan against the specified target. will return list of CVEs with a CVSS score of 5 or higher by default. The scan uses the nmap vulners script which leverages the vulners.com vulnerability database to perform vulnerability detection based on the software and services running on the target host(s)."""
      
     header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
+    await validate_mcp_api_key(header_data)
+    params = {'tool_prms': {}}
 
     if interface and interface.strip() != '':
         params['interface'] = interface
 
-    params['target'] = target
-    code, output, error, _ = await run_task(action="scan_arp", params=json.dumps(params))
-    return await save_log_and_return(code, output, error, log_name=f"arp_scan_result")
+    if min_score is not None:
+        params['tool_prms']['min_score'] = str(min_score)
+
+    params['tool_prms']['target'] = target
+    code, output, error, _ = await run_task(action="scan_vuln", params=json.dumps(params))
+    return await save_log_and_return(code, output, error, log_name=f"vulnerability_scan_result")
 
 @mcp.tool
-async def scan_dev_id(target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."], enable_os_detection: Annotated[bool, "Enables OS detection + service identification scan. Service identification is enabled by default (the variable is set to False by default). If OS detection is requested, set this variable to True."] = False, interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
-    """Device identification conducts OS and Service (port) identification scans for all endpoints on the network. If OS detection is enabled it creates more traffic noise however the perfomance should be negligible on most networks."""
+async def scan_srvc(target: Annotated[str, "The subnet, network device IP or hostname to run the scan on."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
+    """Identifies all running services on the specified target by performing a nmap service/version detection scan (-sV)."""
      
     header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
+    await validate_mcp_api_key(header_data)
+    params = {'tool_prms': {}}
 
     if interface and interface.strip() != '':
         params['interface'] = interface
-          
-    if enable_os_detection is True:
-        params['noise'] = True
        
-    params['target'] = target
+    params['tool_prms']['target'] = target
     code, output, error, _ = await run_task(action="scan_dev_id", params=json.dumps(params))
     return await save_log_and_return(code, output, error, log_name=f"device_id_scan_result")
 
@@ -172,90 +131,62 @@ async def scan_snmp(target: Annotated[str, "The subnet, network device IP or hos
     """SNMP scan identifies SNMP capable network devices, runs specified nmap SNMP scripts to perform SNMPv3 GET requests and SNMP polling and retireves all available SNMP data for the specified target."""
      
     header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
+    await validate_mcp_api_key(header_data)
+    params = {'tool_prms': {}}
 
     if interface and interface.strip() != '':
         params['interface'] = interface
 
     if scripts and scripts.strip() != '':
-        params['scripts'] = scripts
+        params['tool_prms']['scripts'] = scripts
 
     if community and community.strip() != '':
-        params['community'] = community
-
-    params['target'] = target
+        params['tool_prms']['target'] = target
+        code, output, error, _ = await run_task(action="scan_snmp", params=json.dumps(params), snmp_community=community)
+        return await save_log_and_return(code, output, error, log_name=f"snmp_scan_result")
+        
+    params['tool_prms']['target'] = target
     code, output, error, _ = await run_task(action="scan_snmp", params=json.dumps(params))
     return await save_log_and_return(code, output, error, log_name=f"snmp_scan_result")
-
-@mcp.tool
-async def scan_dev_fngr(target: Annotated[str, "The network device IP or hostname to run the scan on."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, limit: Annotated[bool, "Enable more aggresive OS detection or limited OS detection. If aggresive OS identification is specified, set variable to False"] = True):
-    """Device fingerprint scan performs OS identification for the specified network host or network devices within the specified subnet."""
-     
-    header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
-
-    if interface and interface.strip() != '':
-        params['interface'] = interface
-
-    if limit is False:
-        params['limit'] = False
-
-    params['target'] = target
-    code, output, error, _ = await run_task(action="scan_dev_fngr", params=json.dumps(params))
-    return await save_log_and_return(code, output, error, log_name=f"device_fingerprint_result")
-
-@mcp.tool
-async def scan_port(interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, target: Annotated[str, "The network device IP or hostname to run the scan on."] = None, ports: Annotated[str, "The ports to scan for on the specified target. The specified ports should be in the following format: 'port1,port2,port3,port4...'"] = None):
-    """Port scan identifies the open ports (services) open on all devices within a subnet or on a specified network host target."""
-     
-    header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
-
-    if interface and interface.strip() != '':
-        params['interface'] = interface
-
-    if ports and ports.strip() != '':
-        params['ports'] = ports
-
-    params['target'] = target
-    code, output, error, _ = await run_task(action="scan_port", params=json.dumps(params))
-    return await save_log_and_return(code, output, error, log_name=f"deviceid_result")
 
 @mcp.tool
 async def scan_custom(target: Annotated[str, "The network device IP or hostname to run the scan on."], options: Annotated[str, "The nmap scan options to run."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
     """Custom scan runs an nmap scan with the specified commandline options on all devices within a subnet or on the specified network host target."""
      
     header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
+    await validate_mcp_api_key(header_data)
+    params = {'tool_prms': {}}
 
     if interface and interface.strip() != '':
         params['interface'] = interface
 
     if options and options.strip() != '':
-        params['options'] = options
+        params['tool_prms']['options'] = options
 
     if target and target.strip() != '':
-        params['target'] = target
+        params['tool_prms']['target'] = target
 
     code, output, error, _ = await run_task(action="scan_custom", params=json.dumps(params))
     return await save_log_and_return(code, output, error, log_name=f"custom_scan_result")
 
 @mcp.tool
-async def scan_full(target: Annotated[str, "The network device IP or hostname to run the scan on."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None):
+async def scan_map(target: Annotated[str, "The network device IP or hostname to run the scan on."], interface: Annotated[str, "The physical network interface port the scan will run on. Defaults to the primary interface on the host."] = None, syn_ports: Annotated[str, "The TCP SYN ports to use for host discovery in the nmap scan. Defaults to 22,23,80,443,830,3389."] = None, ack_ports: Annotated[str, "The TCP ACK ports to use for host discovery in the nmap scan. Defaults to 80,443."] = None):
     """Full scan runs a full network device discovery an a specified subnet. Enable OS detection, version detection, script scanning, and traceroute."""
 
     header_data = get_http_headers()
-    verify_api(header_data)
-    params = {}
+    await validate_mcp_api_key(header_data)
+    params = {'tool_prms': {}}
 
     if interface and interface.strip() != '':
         params['interface'] = interface
 
-    params['target'] = target
+    if syn_ports and syn_ports.strip() != '':
+        params['tool_prms']['syn_ports'] = syn_ports
+
+    if ack_ports and ack_ports.strip() != '':
+        params['tool_prms']['ack_ports'] = ack_ports
+
+    params['tool_prms']['target'] = target
     code, output, error, _ = await run_task(action="scan_full", params=json.dumps(params))
 
     return await save_log_and_return(code, output, error, log_name=f"full_scan_result")
@@ -265,7 +196,7 @@ async def pcap_lcl(interface: Annotated[str, "The physical network interface por
     """pcap local captures and logs ingress and egress traffic on a local network interface using tcpdump. PCAP results are stored in '/home/quart/probedata/pcaps'."""
 
     header_data = get_http_headers()
-    verify_api(header_data)
+    await validate_mcp_api_key(header_data)
     params = {}
 
     if interface and interface.strip() != '':
@@ -283,7 +214,7 @@ async def pcap_tux(remote_interface: Annotated[str, "The physical network interf
     """pcap remote linux captures and logs ingress and egress traffic on a remote linux host's specified network interface using tcpdump. Rsync copies the remote PCAPS results from the remote linux host to the local probe '/probedata/pcaps' directory."""
 
     header_data = get_http_headers()
-    verify_api(header_data)
+    await validate_mcp_api_key(header_data)
     params = {}
 
     if remote_interface and remote_interface.strip() != '':
@@ -306,7 +237,7 @@ async def pcap_win(remote_interface: Annotated[str, "The physical network interf
     """pcap remote windows captures and logs ingress and egress traffic on a remote windows host's specified network interface using tshark (commandline wireshark) and npcap. Remote PCAP results are written to the local '/probedata/pcaps' directory from the stdout output from the ssh session."""
 
     header_data = get_http_headers()
-    verify_api(header_data)
+    await validate_mcp_api_key(header_data)
     params = {}
 
     if remote_interface and remote_interface.strip() != '':

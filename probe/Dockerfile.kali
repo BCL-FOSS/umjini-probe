@@ -12,17 +12,14 @@ RUN apt update -y && apt install -y \
     --no-install-recommends
 
 RUN apt-get install -y \
-    tshark \
     tcpdump \
     iputils-ping \
     iperf3 \
-    aircrack-ng \
-    libpcap-dev \
-    p0f \
     traceroute \
     sshpass \
-    dnsdiag \
-    nmap
+    dnsdiag
+
+RUN pip3 install dnsdiag
 
 RUN rm -rf /var/lib/apt/lists/*
 
@@ -33,7 +30,7 @@ RUN mkdir /home/quart/probedata/pcaps
 
 COPY probe/requirements.txt ./
 
-RUN pip install --no-cache-dir -r requirements.txt --upgrade 
+RUN pip3 install --no-cache-dir -r requirements.txt --upgrade 
 
 COPY probe/ /home/quart/
 

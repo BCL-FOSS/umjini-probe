@@ -3,7 +3,7 @@ services:
     restart: always
     build:
       context: .
-      dockerfile: probe/Dockerfile.kali
+      dockerfile: probe/Dockerfile
     container_name: umjprobe
     environment:
       - PROBE_DB=127.0.0.1

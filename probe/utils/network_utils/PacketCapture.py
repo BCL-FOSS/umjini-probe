@@ -2,15 +2,14 @@ from utils.network_utils.base.Network import Network
 from datetime import datetime, timezone
 import asyncio
 from pathlib import Path
-import logging
-
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger('passlib').setLevel(logging.ERROR)
-logger = logging.getLogger(__name__)
+from probe.init_app import logger
 
 class PacketCapture(Network):
     def __init__(self):
         super().__init__()
+        self.host = None
+        self.user = None
+        self.password = None
         
     def set_host(self, host: str):
         self.host = host
@@ -80,9 +79,9 @@ class PacketCapture(Network):
         finally:
             stdout, stderr = await proc.communicate()
     
-            self.logger.error(stderr.decode())
+            logger.error(stderr.decode())
         
-            self.logger.info(stdout.decode())
+            logger.info(stdout.decode())
 
             return_code = await proc.wait()
 
