@@ -52,7 +52,6 @@ class FlowRunner:
                         remote_tools_to_execute[node_id] = {'name': node_data['prb-trcrttype'], 'arguments': remote_tool_params, 'prb': node_data['name']}
 
                     if node_data['prb-perftype']:
-
                         if node_data['prb-perfoptions']:
                             remote_tool_params['tool_prms']['options'] = node_data['prb-perfoptions']
                         if node_data['prb-perfserver'] and node_data['prb-perftype'] == 'spdtst_clnt':
@@ -64,29 +63,27 @@ class FlowRunner:
                         if node_data['prb-scantarget']:
                             remote_tool_params['tool_prms']['target'] = node_data['prb-scantarget']
 
-                        if node_data['prb-scandevidnoise'] == 'n' and node_data['prb-scanstype'] == 'scan_dev_id':
-                            remote_tool_params['tool_prms']['limit'] = False
+                        if node_data['prb-scanstype'] == 'scan_snmp':
+                            if node_data['prb-snmpscanscripts']:
+                                remote_tool_params['tool_prms']['scripts'] = node_data['prb-snmpscanscripts']
 
-                        if node_data['prb-scanfplimit'] == 'y' and node_data['prb-scanstype'] == 'scan_dev_fngr':
-                            remote_tool_params['tool_prms']['noise'] = True
-
-                        if node_data['prb-scansnamptype'] and node_data['prb-scanstype'] == 'scan_snmp':
-                            remote_tool_params['tool_prms']['type'] = node_data['prb-scansnamptype']
-
-                        if node_data['prb-snmpscanscripts'] and node_data['prb-scanstype'] == 'scan_snmp':
-                            remote_tool_params['tool_prms']['scripts'] = node_data['prb-snmpscanscripts']
-
-                        if node_data['prb-snmpcommunity'] and node_data['prb-scanstype'] == 'scan_snmp':
-                            remote_tool_params['community'] = node_data['prb-snmpcommunity']
+                            if node_data['prb-snmpcommunity']:
+                                remote_tool_params['community'] = node_data['prb-snmpcommunity']
 
                         if node_data['prb-scanoptions']:
                             remote_tool_params['tool_prms']['options'] = node_data['prb-scanoptions']
 
-                        if node_data['prb-scanports'] and node_data['prb-scanstype'] == 'scan_port':
-                            remote_tool_params['tool_prms']['ports'] = node_data['prb-scanports']
-
                         if node_data['prb-scantgtifacedef'] == 'y' and node_data['scantgtiface']:
                             remote_tool_params['interface'] = node_data['prb-scantgtiface']
+
+                        if node_data['prb-scanvulnscore'] and node_data['prb-scanstype'] == 'vuln_scan':
+                            remote_tool_params['tool_prms']['min_score'] = node_data['prb-scanvulnscore']
+
+                        if node_data['prb-scantype'] == 'scan-map':
+                            if node_data['prb-scantcpsyn']:
+                                remote_tool_params['tool_prms']['syn_ports'] = node_data['prb-scantcpsyn']
+                            if node_data['prb-scantcpack']:
+                                remote_tool_params['tool_prms']['ack_ports'] = node_data['prb-scantcpack']
 
                         remote_tools_to_execute[node_id] = {'name': node_data['prb-scanstype'], 'arguments': remote_tool_params, 'prb': node_data['name']}
 
@@ -115,12 +112,6 @@ class FlowRunner:
                     if node_data['scan-useiface'] == 'n' and node_data['scan-iface']:
                         params['interface'] = node_data['scan-iface']
 
-                    if node_data['scan-fplimit'] == 'y' and node_data['scan-type'] == 'scan_dev_fngr':
-                        params['tool_prms']['limit'] = False
-
-                    if node_data['scan-devidnoise'] == 'n' and node_data['scan-type'] == 'scan_dev_id':
-                        params['tool_prms']['noise'] = True
-
                     if node_data['scan-snmpscripts'] and node_data['scan-type'] == 'scan_snmp':
                         params['tool_prms']['scripts'] = node_data['scan-snmpscripts']
 
@@ -129,9 +120,6 @@ class FlowRunner:
 
                     if node_data['scan-options']:
                         params['tool_prms']['options'] = node_data['scan-options']
-
-                    if node_data['scan-ports'] and node_data['scan-type'] == 'scan_port':
-                        params['tool_prms']['ports'] = node_data['scan-ports']
 
                     local_tools_to_execute[node_id]['prms'] = params
 

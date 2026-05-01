@@ -69,7 +69,7 @@ class NetworkDiscovery(Network):
         return code, output, error
     
     async def mapper(self, target: str, syn_ports: str = '22,23,80,443,830,3389', ack_ports: str = '80,443'):
-        code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('map')} -PS{syn_ports} -PA{ack_ports} {target}")
+        code, output, error = await self.run_shell_cmd(cmd=f"{self.command_map.get('map')} -PS{syn_ports} -PA{ack_ports} -PU {target}")
 
         return code, output, error
 
