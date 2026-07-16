@@ -2,62 +2,46 @@ from datetime import datetime
 import asyncio
 import argparse
 from datetime import datetime, timezone
-from websockets.asyncio.client import connect
+from websockets.sync.client import connect
 import json
 from probe.init_app import log_alert
-from script_base.base import run_task, parse_scan_results, send_smartbot_data
+from script_base.base import run_task, parse_scan_results
 
-async def automate_task(action: str, params: str, ws_url: str, probe_data: str, llm_data: str = None, snmp_community: str = None):
+async def automate_task(tools_to_execute: list[dict], ws_url: str, probe_id: str):
     async with connect(uri=ws_url) as websocket:
-        code, output, error, file_name = await run_task(action=action, params=params, snmp_community=snmp_community)
-
-        result = await parse_scan_results(action=action, file_name=file_name, probe_data_dict=json.loads(probe_data), params_dict=json.loads(params), output=output)
-
-        log_message=f""
-        log_message+=f"{code}\n\n"
-        log_message+=f"{output}\n\n"
-        log_message+=f"{error}"
-
-        timestamp = datetime.now(tz=timezone.utc).isoformat()
-
-        await log_alert.write_log(log_name=f"{action}_result_{timestamp}", message=log_message)
-
-        smartbot_data = json.loads(llm_data) if llm_data is not None else None
-
-        await send_smartbot_data(ws=websocket, probe_data_dict=json.loads(probe_data), smartbot_data=smartbot_data, tool_call_resp=result)
+        log_message = ""
+        for tool in tools_to_execute:
+            action = tool.get('action')
+            params = tool.get('prms')
+            snmp_community = params.get('community') if 'community' in params else None
+            timestamp = datetime.now(tz=timezone.utc).isoformat()
+            code, output, error, file_name = await run_task(action=action, params=params, snmp_community=snmp_community)
+            result = await parse_scan_results(action=action, file_name=file_name, probe_id=probe_id, params_dict=json.loads(params), output=output)
+            tool['output'] = output
+            tool['parsed'] = result
+            tool['timestamp'] = timestamp
+            log_message+=f"Code: {code}\nOutput: {output}\nError: {error}\n\n" 
+        await log_alert.write_log(log_name=f"{action}_result_{datetime.now(tz=timezone.utc).isoformat()}", message=log_message)
+        websocket.send(json.dumps({'act': 'ingest','prbid': probe_id, 'data': json.dumps(tools_to_execute)}))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Automate network monitoring tasks.")
     parser.add_argument(
-        '-a', '--action', 
+        '-t', '--tasks', 
         type=str, 
         help="Network task to perform"
     )
-    parser.add_argument(
-        '-p', '--params', 
-        type=str, 
-        help="params_dict for the network task"
-    )
+   
     parser.add_argument(
         '-w', '--ws_url', 
         type=str, 
         help="WebSocket URL for reporting results"
     )
     parser.add_argument(
-        '-pdta', '--probe_data', 
+        '-pid', '--probe_id', 
         type=str, 
-        help="Probe data for reporting results"
-    )
-    parser.add_argument(
-        '-llmdta', '--llm_data', 
-        type=str, 
-        help="Data for smartbot to determine alerts and analysis (e.g., prompt, alert preferences)"
-    )
-    parser.add_argument(
-        '-snmp', '--snmp_community', 
-        type=str, 
-        help="SNMP community string for nmap SNMP scans"
+        help="Probe ID for reporting results"
     )
     args = parser.parse_args()
 
-    asyncio.run(automate_task(action=args.action, params=args.params, ws_url=args.ws_url, probe_data=args.probe_data, llm_data=args.llm_data, snmp_community=args.snmp_community))
+    asyncio.run(automate_task(tools_to_execute=json.loads(args.tasks), ws_url=args.ws_url, probe_id=args.probe_id))

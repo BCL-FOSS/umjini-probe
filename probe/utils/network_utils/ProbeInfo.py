@@ -6,7 +6,7 @@ import re
 import shutil
 import fcntl
 import struct
-from utils.network_utils.base.Network import Network
+from probe.utils.network_utils.base.Network import Network
 import uuid
 import dns.resolver
 import dns.reversename

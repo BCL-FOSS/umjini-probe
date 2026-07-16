@@ -1,5 +1,6 @@
 import logging
 import re
+from probe.init_app import logger
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('passlib').setLevel(logging.ERROR)

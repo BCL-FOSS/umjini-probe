@@ -1,12 +1,12 @@
 import asyncio
 import websockets
 import os
-from websockets import ClientConnection, ConnectionClosed
+from websockets.sync.client import ClientConnection
+from websockets.sync.client import connect
 import os
 import json
-from websockets import ConnectionClosed
 from typing import Optional
-from websockets.asyncio.client import connect
+#from websockets import connect
 import asyncio
 from datetime import datetime, timezone
 from init_app import log_alert, slack_alert, jira_alert, email_alert, prb_db, logger, action_map
@@ -100,7 +100,7 @@ class CoreClient:
                     code, output, error, _ = await run_task(action=core_act_data['alerts']['tool'], params=params)
 
                     if code != 0:
-                                logger.info(f"{code}\n{error}\n{output}")
+                        logger.info(f"{code}\n{error}\n{output}")
 
                     task_name = f"alert_{core_act_data['flow_name']}_{datetime.now(tz=timezone.utc).isoformat()}" if 'flow_name' in core_act_data else f"alert_{core_act_data['task_type']}_{datetime.now(tz=timezone.utc).isoformat()}"
 
@@ -126,7 +126,7 @@ class CoreClient:
                 }
                 try:
                     await ws.send(json.dumps(ping))
-                except ConnectionClosed:
+                except websockets.ConnectionClosed:
                     self.logger.warning("Heartbeat: connection closed")
                     break
                 except asyncio.CancelledError:
@@ -163,7 +163,7 @@ class CoreClient:
 
                 try:
                     await ws.send(json.dumps(network_map_result))
-                except ConnectionClosed:
+                except websockets.ConnectionClosed:
                     self.logger.warning("Network mapping: connection closed")
                     break
                 except asyncio.CancelledError:

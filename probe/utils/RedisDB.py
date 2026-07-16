@@ -1,14 +1,13 @@
 import redis.asyncio as redis
 import json
-import logging
-import os
+from init_app import logger
 
 class RedisDB:
    
     def __init__(self, hostname='', port=''):
         self.host_name=hostname
         self.port=port
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         
     async def connect_db(self):
         self.redis_conn = redis.from_url( 

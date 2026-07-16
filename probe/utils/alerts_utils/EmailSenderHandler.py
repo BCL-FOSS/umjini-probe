@@ -1,13 +1,11 @@
 import brevo_python
 from brevo_python.rest import ApiException
-import logging
-
-logging.basicConfig(level=logging.INFO)
+from probe.init_app import logger
 
 class EmailSenderHandler:
-    def __init__(self, brevo_api_key: str):
+    def __init__(self):
         self.configuration = brevo_python.Configuration()
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     def set_brevo_api_key(self, brevo_api_key: str):
         self.configuration.api_key['api-key'] = brevo_api_key

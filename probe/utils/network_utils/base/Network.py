@@ -1,15 +1,12 @@
 import platform
-import logging
 import asyncio
-import subprocess
+from probe.init_app import logger
 
 class Network():
     
     def __init__(self):
-        logging.basicConfig(level=logging.DEBUG)
-        logging.getLogger('passlib').setLevel(logging.ERROR)
         self.system = platform.system().lower()
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     async def run_shell_cmd(self, cmd: str):
         process = await asyncio.create_subprocess_shell(

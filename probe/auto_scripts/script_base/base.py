@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 import xmltodict
 from crontab import CronTab
-from websockets.asyncio.client import ClientConnection
+from websockets.sync.client import ClientConnection
 
 async def run_task(action: str, params: str = None, snmp_community: str = None):
 
@@ -53,7 +53,7 @@ async def run_task(action: str, params: str = None, snmp_community: str = None):
     else:
         return code, output, error
         
-async def parse_scan_results(action: str, file_name: str, probe_data_dict: dict, params_dict: dict, output: str):
+async def parse_scan_results(action: str, file_name: str, probe_id: str, params_dict: dict, output: str):
     match action:
         case str() as s if s.startswith("scan_"):                   
             with open(file=f"{file_name}") as xml_file:
@@ -63,7 +63,7 @@ async def parse_scan_results(action: str, file_name: str, probe_data_dict: dict,
         case str() as s if s.startswith("trcrt"):
             hops = parsers.parse_traceroute_output(output, action)
             result = {
-                        "source": probe_data_dict.get('prb_id'),
+                        "source": probe_id,
                         "destination": params_dict['tool_prms']['target'],
                         "trace_type": action,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -147,18 +147,3 @@ def schedule_cronjob(job1: CronTab, core_act_data: dict):
                     job1.month.every(months_range[0])
                                     
     return job1
-
-async def send_smartbot_data(ws: ClientConnection, smartbot_data: dict, probe_data_dict: dict, tool_call_resp: dict):
-    smartbot_call = {
-        'act': 'smartbot',
-        'url': f"{probe_data_dict.get('url')}/llm/mcp",
-        'tool_output': json.dumps(tool_call_resp),
-        'task_type': "chat_task",
-        'prompt': smartbot_data.get('prompt'),
-        'prb_api_key': probe_data_dict.get('prb_api_key'),
-        'prb_id': probe_data_dict.get('prb_id'),
-        'prb_name': probe_data_dict.get('name'),
-        'site': probe_data_dict.get('site'),
-        'alerts': {'tool': smartbot_data.get('alerts')}
-    }
-    await ws.send(json.dumps(smartbot_call))

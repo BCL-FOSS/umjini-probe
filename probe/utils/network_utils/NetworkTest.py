@@ -1,4 +1,4 @@
-from utils.network_utils.base.Network import Network
+from probe.utils.network_utils.base.Network import Network
 from datetime import datetime, timezone
 
 class NetworkTest(Network):

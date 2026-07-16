@@ -1,4 +1,4 @@
-from alert_base.Alert import Alert
+from probe.utils.alerts_utils.alert_base.Alert import Alert
 import json
 
 class JiraSM(Alert):

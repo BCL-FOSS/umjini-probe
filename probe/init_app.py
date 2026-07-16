@@ -58,9 +58,6 @@ action_map: dict[str, Callable[[dict], object]] = {
 }
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 prb_db = RedisDB(hostname=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'))
-r = redis.Redis(host=os.environ.get('PROBE_DB'), port=os.environ.get('PROBE_DB_PORT'), decode_responses=True)
-pong = r.ping()
-logger.info(f"Redis ping: {pong}")
 error_response = 'missing required data'
 
 def init_probe():
@@ -69,33 +66,47 @@ def init_probe():
         exit(1)
 
     prb_id, hstnm = probe_util.gen_probe_register_data()
-    _, keys = r.scan(cursor=0, match=f'*prb:*')
-
+    
     if os.environ.get('DEFAULT_INTERFACE') is None:
         net_discovery.set_interface(probe_util.get_ifaces()[0])
     else:
         net_discovery.set_interface(os.environ.get('DEFAULT_INTERFACE'))
 
-    if not keys:
+    probe_data_check = asyncio.run(prb_db.get_all_data(match='*prb:*', cnfrm=True))
+
+    if probe_data_check is False:
         probe_data=probe_util.collect_local_stats(id=f"{prb_id}", hostname=hstnm)
         host_interfaces = probe_util.get_ifaces()
         probe_data['iface_list'] = host_interfaces
         logger.info(host_interfaces)
 
-        str_hashmap = {str(k): str(v) for k, v in probe_data.items()}
-        result = r.hset(prb_id, mapping=str_hashmap)
-        logger.info(result)
+        data_uploaded = asyncio.run(prb_db.upload_db_data(id=f"{prb_id}", data=probe_data))
+        if data_uploaded is None:
+            logger.error(f"Failed to upload probe data to Redis for probe ID: {prb_id}")
+            exit(1)
 
-        if isinstance(result, int):
+        if data_uploaded > 0:
             return prb_id, hstnm, probe_data
 
-    if keys:
-        for redis_key in keys:
-            hash_data = r.hgetall(redis_key)
-            logger.info(hash_data)
-            prb_id = hash_data.get('prb_id')
-            probe_data = hash_data
+    elif probe_data_check is True:
+        probe_data = asyncio.run(prb_db.get_all_data(match='*prb:*'))
+        probe_data_dict = next(iter(probe_data.values()))
+        prb_id = probe_data_dict.get('prb_id')
+        hstnm = probe_data_dict.get('hstnm')
         return prb_id, hstnm, probe_data
+    
+async def check_api_key(key: str):
+    probe_data = await prb_db.get_all_data(match='*prb:*')
+    probe_data_dict = next(iter(probe_data.values()))
+    stored_api_key = probe_data_dict.get("api_key")
+    
+    if not stored_api_key or not bcrypt.verify(key, stored_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid"
+        )
+    else:
+        return 200
             
 async def validate_api_key(key: str = Depends(api_key_header)):
     if not key:
@@ -124,15 +135,4 @@ async def validate_mcp_api_key(headers: dict[str, str]) -> None:
         )
     await check_api_key(key)
     
-async def check_api_key(key: str):
-    probe_data = await prb_db.get_all_data(match='*prb:*')
-    probe_data_dict = next(iter(probe_data.values()))
-    stored_api_key = probe_data_dict.get("api_key")
-    
-    if not stored_api_key or not bcrypt.verify(key, stored_api_key):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid"
-        )
-    else:
-        return 200
+

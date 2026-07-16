@@ -2,7 +2,7 @@ import asyncio
 import asyncio
 from pysnmp.hlapi.v3arch.asyncio import *
 from pysnmp.smi.rfc1902 import ObjectIdentity, ObjectType
-from utils.network_utils.base.Network import Network
+from probe.utils.network_utils.base.Network import Network
 import asyncio
 from bs4 import BeautifulSoup
 import httpx

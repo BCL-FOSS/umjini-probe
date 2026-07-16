@@ -1,4 +1,4 @@
-websockets
+websockets==16.1
 requests
 psutil
 iperf3

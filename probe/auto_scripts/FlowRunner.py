@@ -1,9 +1,11 @@
 import datetime
 import ast
 from datetime import datetime, timezone
-from probe.init_app import action_map, log_alert, probe_util, net_discovery, logger, prb_db
+from probe.init_app import action_map, log_alert, logger, prb_db
 from script_base.base import run_task
 import json
+import argparse
+import asyncio
 
 class FlowRunner:
     def __init__(self):
@@ -245,3 +247,27 @@ class FlowRunner:
                         node_output_mapping[node_id]['tool'] = bot_data['payload']['tool']
 
         return node_output_mapping, alerts, agents
+    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run network automation workflows.")
+    parser.add_argument(
+        '-f', '--flow', 
+        type=str, 
+        help="Network flow to execute"
+    )
+   
+    parser.add_argument(
+        '-w', '--ws_url', 
+        type=str, 
+        help="WebSocket URL for reporting results"
+    )
+    parser.add_argument(
+        '-pid', '--probe_id', 
+        type=str, 
+        help="Probe ID for reporting results"
+    )
+    args = parser.parse_args()
+
+    workflow_runner = FlowRunner()
+
+    asyncio.run(workflow_runner.run(flow_str=str(args.flow), ws_url=args.ws_url, probe_id=args.probe_id))
