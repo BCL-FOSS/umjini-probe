@@ -19,5 +19,5 @@ aiofiles
 onetimesecret
 httpx
 websocket-client
-python-crontab
-xmltodict
+python-crontab==3.3.0
+xmltodict==1.0.4

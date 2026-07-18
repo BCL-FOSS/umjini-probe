@@ -16,6 +16,7 @@ import os
 from datetime import datetime, timezone
 from websockets import connect
 import websockets
+import uuid
 
 class InitCall(BaseModel):
     umj_url: str 
@@ -295,11 +296,16 @@ async def flows(command: str, flow_data: FlowCall = None):
         case 'new':
             flow_data = {
                 'id': flow_data.id,
-                'probe': flow_data.probe,
+                'prb_id': flow_data.probe,
                 'flow': flow_data.flow,
                 'name': flow_data.name,
                 'user_id': flow_data.user_id
             }
+
+            if flow_data.id == "default":
+                flow_data.id = f"flow:{flow_data.name}:{str(uuid.uuid4())}"
+                logger.info(flow_data.id)
+              
             job1 = None
             cwd = os.getcwd() 
             now = datetime.now(tz=timezone.utc).isoformat()
@@ -334,5 +340,5 @@ async def flows(command: str, flow_data: FlowCall = None):
             flow_data = next(iter(flow.values())) if flow is not None else None
             return Response(content=json.dumps(flow_data), media_type="application/json", status_code=200) if flow_data is not None else Response(content='{"status": "flow load failed"}', media_type="application/json", status_code=400)
         case 'edit':
-            result = await prb_db.upload_db_data(id=flow_data.id, data=flow_data)
+            result = await prb_db.upload_db_data(id=flow_data.id, data={'flow': flow_data.flow})
             return Response(content='{"status": "flow edited"}', media_type="application/json", status_code=200) if result is not None else Response(content='{"status": "flow edit failed"}', media_type="application/json", status_code=400)

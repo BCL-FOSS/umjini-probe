@@ -123,6 +123,15 @@ class FlowRunner:
                     if node_data['scan-options']:
                         params['tool_prms']['options'] = node_data['scan-options']
 
+                    if node_data['scan-vulnscore'] and node_data['scan-type'] == 'scan_vuln':
+                        params['tool_prms']['min_score'] = node_data['scan-vulnscore']
+
+                    if node_data['scan-map-syn'] and node_data['scan-type'] == 'scan_map':
+                        params['tool_prms']['syn_ports'] = node_data['scan-map-syn']
+
+                    if node_data['scan-map-ack'] and node_data['scan-type'] == 'scan_map':
+                        params['tool_prms']['ack_ports'] = node_data['scan-map-ack']
+
                     local_tools_to_execute[node_id]['prms'] = params
 
                 case 'pcaps':
